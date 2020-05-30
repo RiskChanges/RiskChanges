@@ -1,5 +1,5 @@
 # In[1]:
-from RiskChange import Exposure
+from RiskChanges import Exposure
 EAR_poly="D:\\SDSS\\Sample data\\Jamoats_data.shp"
 EAR_poin="D:\\SDSS\\Sample data\\point_test.shp"
 EAR_line="D:\\SDSS\\Sample data\\line_test.shp"
