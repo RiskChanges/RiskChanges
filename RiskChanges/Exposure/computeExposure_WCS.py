@@ -329,7 +329,7 @@ def main(input_zone, input_value_raster,earsource,**kwargs):
     elif earsource =="pgtable":
         connString = kwargs.get('connString', "None")
         if(connString=="None"):
-            print("Please Supply valid connection string")
+            #print("Please Supply valid connection string")
         #print("please supply valid data and their source")
         return loop_zonal_statsPG(input_zone, input_value_raster,connString)
     elif earsource=="wfs":
@@ -338,7 +338,7 @@ def main(input_zone, input_value_raster,earsource,**kwargs):
             return("Please provide valid WFS URL")
         return loop_zonal_statsWFS(input_zone,input_value_raster,wfsURL)
     else:
-        print("please supply valid data and their source")
+        #print("please supply valid data and their source")
         
 #'''    databaseServer = "127.0.0.1"
 #    databaseName = "postgres"

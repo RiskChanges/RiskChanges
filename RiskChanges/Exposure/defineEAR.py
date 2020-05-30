@@ -97,5 +97,5 @@ def changeProj(inear,types,epsg,outear,outdir,conn):
             DriverName="PostgreSQL"
             #print("Updating")
         else:
-            print ("Plese provide proper data type name")
+            return "Plese provide proper data type name"
         
