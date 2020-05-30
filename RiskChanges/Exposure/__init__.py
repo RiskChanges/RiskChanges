@@ -1,4 +1,4 @@
-from RiskChange.Exposure.computeExposure_WCS import main as computeExposure
-from RiskChange.Exposure.defineEAR import defineEAR
-from RiskChange.Exposure.defineHaz import defineHaz
-from RiskChange.Exposure.standardizeHaz import reclassify as standardizeHaz
+from RiskChanges.Exposure.computeExposure_WCS import main as computeExposure
+from RiskChanges.Exposure.defineEAR import defineEAR
+from RiskChanges.Exposure.defineHaz import defineHaz
+from RiskChanges.Exposure.standardizeHaz import reclassify as standardizeHaz
