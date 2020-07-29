@@ -8,13 +8,12 @@ setup(
   author = 'Ashok Dahal ',                   # Type in your name
   author_email = 'ashokdahal.geo@gmail.com',      # Type in your E-Mail
   url = 'https://github.com/ashokdahal',   # Provide either the link to your github or to your website
-  download_url = 'https://github.com/ashokdahal/RiskChanges/archive/0.4.tar.gz',    # I explain this later on
+  download_url = 'https://github.com/ashokdahal/RiskChanges/archive/0.5.tar.gz',    # I explain this later on
   keywords = ['Risk', 'Natural Hazard', 'Loss'],   # Keywords that define your package best
   install_requires=[            # I get to this in a second
           'gdal',
           'rasterio',
           'numpy',
-          'ogr',
           'rasterstats',
           'shapely',
           'owslib'
