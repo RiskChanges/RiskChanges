@@ -39,7 +39,8 @@ def loadshp(shpInput,connstr,lyrName,schema):
     geodataframe = geopandas.read_file(shpInput) 
     
     #Identify CRS
-    crs_name=str(geodataframe.crs['init'])
+    crs_name=str(geodataframe.crs.srs)
+    #crs_name=str(geodataframe.crs['init'])
     ##type(crs_name)
     epsg=int(crs_name.replace('epsg:',''))
     if epsg is None:
