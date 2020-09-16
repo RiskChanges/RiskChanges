@@ -34,7 +34,7 @@ import geopandas as gpd
 # In[69]:
 
 
-def loadshp(shpInput,connstr,lyrName,schema):  
+def loadshp(shpInput,connstr,lyrName,schema='public'):  
     #Load data in geodataframe
     geodataframe = geopandas.read_file(shpInput) 
     
@@ -60,7 +60,7 @@ def loadshp(shpInput,connstr,lyrName,schema):
 
     # Use 'dtype' to specify column's type
     # For the geom column, we will use GeoAlchemy's type 'Geometry'
-    geodataframe.to_sql(lyrName, engine, schema='tekson',if_exists='append', index=False, 
+    geodataframe.to_sql(lyrName, engine, schema,if_exists='append', index=False, 
                              dtype={'geom': Geometry(geom_type, srid= epsg)})
 
 
