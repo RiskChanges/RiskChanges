@@ -39,15 +39,16 @@ def loadshp(shpInput,connstr,lyrName,schema):
     geodataframe = geopandas.read_file(shpInput) 
     
     #Identify CRS
+    #return  geodataframe
     crs_name=str(geodataframe.crs.srs)
-    #crs_name=str(geodataframe.crs['init'])
-    ##type(crs_name)
+    print(crs_name)
     epsg=int(crs_name.replace('epsg:',''))
     if epsg is None:
         epsg=4326
     #Identify Geometry type
-    geom_type=geodataframe.geom_type[0]
-    #print(geom_type)
+    geom_type=geodataframe.geom_type[1]
+    
+    
     # Creating SQLAlchemy's engine to use
     engine = create_engine(connstr)
     
@@ -60,8 +61,9 @@ def loadshp(shpInput,connstr,lyrName,schema):
 
     # Use 'dtype' to specify column's type
     # For the geom column, we will use GeoAlchemy's type 'Geometry'
-    geodataframe.to_sql(lyrName, engine, schema='tekson',if_exists='append', index=False, 
-                             dtype={'geom': Geometry(geom_type, srid= epsg)})
+    geodataframe.to_sql(lyrName, engine, schema,if_exists='replace', index=False, 
+                             dtype={'geom': Geometry('Geometry', srid= epsg)})
+    print('Done')
 
 
 # In[70]:

@@ -5,6 +5,7 @@ EAR_poin="D:\\SDSS\\Sample data\\point_test.shp"
 EAR_line="D:\\SDSS\\Sample data\\line_test.shp"
 Haz="D:\\SDSS\\Sample data\\flood.tif"
 
+
 #Reclassify 
 # In[2]
 classif={'low':[0,2],'medium':[1,3],'high':[2,10]}

@@ -61,9 +61,8 @@ def LoadWFS(wfsURL,layer_name,connstr,lyrName,schema):
 
     # Use 'dtype' to specify column's type
     # For the geom column, we will use GeoAlchemy's type 'Geometry'
-    geodataframe.to_sql(lyrName, engine, schema='tekson',if_exists='append', index=False, 
-                             dtype={'geom': Geometry(geom_type, srid= epsg)})    
-
+    geodataframe.to_sql(lyrName, engine, schema=schema,if_exists='replace', index=False, 
+                             dtype={'geom': Geometry('Geometry', srid= epsg)})    
 
 # In[16]:
 

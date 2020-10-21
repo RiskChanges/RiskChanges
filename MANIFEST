@@ -2,3 +2,11 @@
 setup.cfg
 setup.py
 RiskChanges\__init__.py
+RiskChanges\computeExposure.py
+RiskChanges\computeExposure_WCS.py
+RiskChanges\defineEAR.py
+RiskChanges\defineHaz.py
+RiskChanges\load_SHP.py
+RiskChanges\load_WCS.py
+RiskChanges\load_WFS.py
+RiskChanges\standardizeHaz.py
