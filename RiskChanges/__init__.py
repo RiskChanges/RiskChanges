@@ -6,3 +6,4 @@ from .load_SHP import loadshp
 from .load_WFS import LoadWFS
 from .load_WCS import loadWCS
 from .load_vuln import loadvuln
+from .ExposurePG import CalculateExposure

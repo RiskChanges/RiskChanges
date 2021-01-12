@@ -9,4 +9,5 @@ RiskChanges\defineHaz.py
 RiskChanges\load_SHP.py
 RiskChanges\load_WCS.py
 RiskChanges\load_WFS.py
+RiskChanges\load_vuln.py
 RiskChanges\standardizeHaz.py
