@@ -3,11 +3,14 @@
 
 # In[87]:
 
-
-import gdal
+try: 
+    from osgeo import gdal, ogr, osr
+except:
+    import gdal
+    import osr
+    import ogr
+ 
 import numpy
-import ogr
-import osr
 import os
 import sys
 import pandas as pd
