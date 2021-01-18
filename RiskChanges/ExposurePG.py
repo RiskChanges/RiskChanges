@@ -2,8 +2,14 @@
 # coding: utf-8
 
 # In[87]:
+try:
+    from osgeo import gdal, osr, ogr
+except:
+    import gdal
+    import osr
+    import ogr
 
-from osgeo import gdal, osr, ogr
+
 # import gdal
 import numpy
 # import ogr
@@ -138,7 +144,7 @@ def zonalPoint(lyr, input_value_raster, exposure_id, Ear_Table_PK, agg_col):
     df = pd.DataFrame()
     for FID in featlist:
         if agg_col is None:
-            FID += 1
+            # FID += 1
         print(FID)
         feat = lyr.GetFeature(FID)
         geom = feat.GetGeometryRef()
