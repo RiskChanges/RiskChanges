@@ -143,9 +143,6 @@ def zonalPoint(lyr, input_value_raster, exposure_id, Ear_Table_PK, agg_col):
 
     df = pd.DataFrame()
     for FID in featlist:
-        if agg_col is None:
-            # FID += 1
-        print(FID)
         feat = lyr.GetFeature(FID)
         geom = feat.GetGeometryRef()
         mx, my = geom.GetX(), geom.GetY()
