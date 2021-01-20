@@ -41,6 +41,7 @@ def zonalPoly(feat, lyr, input_value_raster):
     targetSR.ImportFromWkt(raster.GetProjectionRef())
     coordTrans = osr.CoordinateTransformation(sourceSR, targetSR)
     #feat = lyr.GetNextFeature()
+    print(feat, '===============feat')
     geom = feat.GetGeometryRef()
     # geom.Transform(coordTrans)
     # Get extent of feat
@@ -143,9 +144,6 @@ def zonalPoint(lyr, input_value_raster, exposure_id, Ear_Table_PK, agg_col):
 
     df = pd.DataFrame()
     for FID in featlist:
-        if agg_col is None:
-            # FID += 1
-        print(FID)
         feat = lyr.GetFeature(FID)
         geom = feat.GetGeometryRef()
         mx, my = geom.GetX(), geom.GetY()
@@ -309,7 +307,7 @@ def ExposurePG(input_zone, input_value_raster, connString, exposure_id, Ear_Tabl
     conn = ogr.Open(connString)
     lyr = conn.GetLayer(input_zone)
     featList = range(lyr.GetFeatureCount())
-
+    print(featList, 'featList')
     statDict = {}
     feat = lyr.GetNextFeature()
     geom = feat.GetGeometryRef()
@@ -318,9 +316,12 @@ def ExposurePG(input_zone, input_value_raster, connString, exposure_id, Ear_Tabl
     df = pd.DataFrame()
     if (geometrytype == 'POLYGON' or geometrytype == 'MULTIPOLYGON'):
         for FID in featList:
+            # print(lyr.GetFeature(0), 'FID field')
             # FID += 1
             print("progress", ((FID*100)/lyr.GetFeatureCount()), "%")
             feat = lyr.GetFeature(FID)
+            if feat is None:
+                feat = lyr.GetFeature(FID+1)
             exposurd = zonalPoly(feat, lyr, input_value_raster)
             df_temp = pd.DataFrame(exposurd, columns=['class', 'exposed'])
             # print(feat['bu'],Ear_Table_PK)
