@@ -26,7 +26,6 @@ from sqlalchemy import create_engine
 
 
 def zonalPoly(feat, lyr, input_value_raster):
-    import gdal
     # Open data
     raster = gdal.Open(input_value_raster)
     # Get raster georeference info
@@ -41,7 +40,6 @@ def zonalPoly(feat, lyr, input_value_raster):
     targetSR.ImportFromWkt(raster.GetProjectionRef())
     coordTrans = osr.CoordinateTransformation(sourceSR, targetSR)
     #feat = lyr.GetNextFeature()
-    print(feat, '===============feat')
     geom = feat.GetGeometryRef()
     # geom.Transform(coordTrans)
     # Get extent of feat
@@ -114,7 +112,7 @@ def zonalPoly(feat, lyr, input_value_raster):
 
 
 # lead co-ordinate system should be EAR
-def zonalPoint(lyr, input_value_raster, exposure_id, Ear_Table_PK, agg_col):
+def zonalPoint(lyr, input_value_raster, exposure_id, Ear_Table_PK, agg_col, progress_recorder=None):
     tempDict = {}
     featlist = range(lyr.GetFeatureCount())
     raster = gdal.Open(input_value_raster)
@@ -144,6 +142,10 @@ def zonalPoint(lyr, input_value_raster, exposure_id, Ear_Table_PK, agg_col):
 
     df = pd.DataFrame()
     for FID in featlist:
+
+        if progress_recorder:
+            progress_recorder.set_progress(FID, lyr.GetFeatureCount())
+
         feat = lyr.GetFeature(FID)
         geom = feat.GetGeometryRef()
         mx, my = geom.GetX(), geom.GetY()
@@ -255,7 +257,7 @@ def zonalLine(feat, lyr, input_value_raster):
 # In[79]:
 
 
-def ExposurePgAg(input_zone, admin_unit, agg_col, input_value_raster, connString, exposure_id, Ear_Table_PK):
+def ExposurePgAg(input_zone, admin_unit, agg_col, input_value_raster, connString, exposure_id, Ear_Table_PK, progress_recorder=None):
     conn = ogr.Open(connString)
     sql = 'SELECT '+input_zone+'.*,'+admin_unit+'.'+agg_col + ' FROM ' + input_zone + \
         ' , '+admin_unit + \
@@ -271,6 +273,10 @@ def ExposurePgAg(input_zone, admin_unit, agg_col, input_value_raster, connString
     df = pd.DataFrame()
     if (geometrytype == 'POLYGON' or geometrytype == 'MULTIPOLYGON'):
         for FID in featList:
+
+            if progress_recorder:
+                progress_recorder.set_progress(FID, lyr.GetFeatureCount())
+
             print("progress", ((FID*100)/lyr.GetFeatureCount()), "%")
             feat = lyr.GetFeature(FID)
             area = feat.GetGeometryRef().GetArea()
@@ -283,9 +289,13 @@ def ExposurePgAg(input_zone, admin_unit, agg_col, input_value_raster, connString
             df = df.append(df_temp, ignore_index=True)
         return df
     elif(geometrytype == 'POINT' or geometrytype == 'MULTIPOINT'):
-        return zonalPoint(lyr, input_value_raster, exposure_id, Ear_Table_PK, agg_col)
+        return zonalPoint(lyr, input_value_raster, exposure_id, Ear_Table_PK, agg_col, progress_recorder)
     elif(geometrytype == 'LINESTRING' or geometrytype == 'MULTILINESTRING'):
         for FID in featList:
+
+            if progress_recorder:
+                progress_recorder.set_progress(FID, lyr.GetFeatureCount())
+
             print("progress", ((FID*100)/lyr.GetFeatureCount()), "%")
             feat = lyr.GetFeature(FID)
             length = feat.GetGeometryRef().Length()
@@ -302,7 +312,7 @@ def ExposurePgAg(input_zone, admin_unit, agg_col, input_value_raster, connString
 # In[139]:
 
 
-def ExposurePG(input_zone, input_value_raster, connString, exposure_id, Ear_Table_PK):
+def ExposurePG(input_zone, input_value_raster, connString, exposure_id, Ear_Table_PK, progress_recorder=None):
     print(input_zone)
     conn = ogr.Open(connString)
     lyr = conn.GetLayer(input_zone)
@@ -318,6 +328,10 @@ def ExposurePG(input_zone, input_value_raster, connString, exposure_id, Ear_Tabl
         for FID in featList:
             # print(lyr.GetFeature(0), 'FID field')
             # FID += 1
+            # print(progress_recorder)
+            if progress_recorder:
+                progress_recorder.set_progress(FID, lyr.GetFeatureCount())
+
             print("progress", ((FID*100)/lyr.GetFeatureCount()), "%")
             feat = lyr.GetFeature(FID)
             if feat is None:
@@ -332,10 +346,15 @@ def ExposurePG(input_zone, input_value_raster, connString, exposure_id, Ear_Tabl
             # print(df)
         return df
     elif(geometrytype == 'POINT' or geometrytype == 'MULTIPOINT'):
-        return zonalPoint(lyr, input_value_raster, exposure_id, Ear_Table_PK, agg_col=None)
+        return zonalPoint(lyr, input_value_raster, exposure_id, Ear_Table_PK, agg_col=None, progress_recorder=progress_recorder)
+
     elif(geometrytype == 'LINESTRING' or geometrytype == 'MULTILINESTRING'):
         for FID in featList:
             # FID += 1
+
+            if progress_recorder:
+                progress_recorder.set_progress(FID, lyr.GetFeatureCount())
+
             print("progress", ((FID*100)/lyr.GetFeatureCount()), "%")
             feat = lyr.GetFeature(FID)
             exposurd = zonalLine(feat, lyr, input_value_raster)
@@ -420,7 +439,7 @@ def todatabase(df, connstr, table_name, schema):
 
 def CalculateExposure(Ear_Table, Ear_Table_PK, haz_dir, connString,
                       connSchema, exposure_id, exposure_table,
-                      admin_unit=None, agg_col=None, aggregation=False):
+                      admin_unit=None, agg_col=None, aggregation=False, celery_progress=False):
     a = re.split(':|//|/|@', connString)
     databaseServer = a[4]
     databaseName = a[6]
@@ -431,12 +450,10 @@ def CalculateExposure(Ear_Table, Ear_Table_PK, haz_dir, connString,
     input_zone = Ear_Table
     input_value_raster = haz_dir
 
-    print(connStringOGR, 'conn===============')
-
     if aggregation is True:
         if admin_unit is not None:
             df = ExposurePgAg(input_zone, admin_unit, agg_col,
-                              input_value_raster, connStringOGR, exposure_id, Ear_Table_PK)
+                              input_value_raster, connStringOGR, exposure_id, Ear_Table_PK, celery_progress)
             df_aggregated = aggregate(df, agg_col)
             todatabase(df, connString, exposure_table, connSchema)
             todatabase(df_aggregated, connString,
@@ -446,6 +463,6 @@ def CalculateExposure(Ear_Table, Ear_Table_PK, haz_dir, connString,
             return ("Please provide the admin unit and aggregation column for the aggregation")
     else:
         df = ExposurePG(input_zone, input_value_raster,
-                        connStringOGR, exposure_id, Ear_Table_PK)
+                        connStringOGR, exposure_id, Ear_Table_PK, celery_progress)
         todatabase(df, connString, exposure_table, connSchema)
         return ('completed')
