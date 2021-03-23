@@ -31,14 +31,14 @@ def get_random_string(length):
 
 
 class Loss:
-    def __init__(self, exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, costColumn, typeColumn, aggrigationColumn, vulnColn, schema, earSchema):
+    def __init__(self, exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, costColumn, typeColumn, aggrigationColumn, vulnColn, schema, organizationSchema):
         self.exposureID = exposureID
         self.exposureIndexTableName = exposureIndexTableName
         self.hazardIndexTableName = hazardIndexTableName
         self.earIndexTableName = earIndexTableName
         self.aggrigationColumn = aggrigationColumn
         self.schema = schema
-        self.earSchema = earSchema
+        self.organizationSchema = organizationSchema
         self.vulnColumn = vulnColn
         self.spprob = 1
         self.Con = None
@@ -107,13 +107,13 @@ class Loss:
 
     def getEarData(self):
         sql_ear = '''SELECT id, "{0}", "{1}", "{2}" FROM {3}.{4}'''.format(
-            self.costColumn, self.typeColumn, self.vulnColumn, self.earSchema, self.earTable)
+            self.costColumn, self.typeColumn, self.vulnColumn, self.organizationSchema, self.earTable)
         self.eartable = pd.read_sql_query(sql_ear, self.Con)
     # get information such as ID, cost, type etc
 
     def getExposureData(self):
         sql_exposure = '''SELECT  "class", "exposed", "geom_id", "exposure_id" FROM "{0}"."{1}"'''.format(
-            self.earSchema, self.exposureTable)
+            self.organizationSchema, self.exposureTable)
         exposure = pd.read_sql_query(sql_exposure, self.Con)
         self.exposuretable = pd.merge(left=exposure, right=self.eartable, how='left', left_on=[
                                       'geom_id'], right_on=['id'])
@@ -146,7 +146,6 @@ class Loss:
                     row.hazIntensity_from+row.hazIntensity_to)/2, axis=1)
                 Y = vulnerbaility.iloc[:, 4].values
                 X = vulnerbaility.iloc[:, 6:7].values
-                # print(X,Y)
 
                 poly = PolynomialFeatures(degree=10)
 
@@ -177,8 +176,8 @@ class Loss:
             self.exposuretable = final_df
 
     def spatial_overlay(self, aggregateon):
-        sql_agg = '''SELECT {0}.* {1}.{2} FROM {0}, {1} WHERE ST_Intersects({0}.geom, {1}.geom)'''.format(
-            self.earTable, aggregateon, aggrigationColumn)
+        sql_agg = '''SELECT {0}.*, {1}.{2} FROM {0}, {1} WHERE ST_Intersects({0}.geom, {1}.geom)'''.format(
+            self.earTable, aggregateon, self.aggrigationColumn)
 
         eartemp = pd.read_sql_query(sql_agg, self.Con)
         self.exposuretable = pd.merge(left=self.exposuretable, right=eartemp[[
@@ -194,6 +193,7 @@ class Loss:
 
             self.exposuretable['loss'] = self.exposuretable.apply(
                 lambda row: row[self.costColumn]*row.exposed*row.vuln*self.spprob/100, axis=1)
+
             self.losstable = self.exposuretable.groupby(
                 ["id"], as_index=False).agg({'loss': 'sum'})
             self.losstableAgg = self.exposuretable.groupby(
@@ -212,16 +212,16 @@ class Loss:
             self.losstable["lossID"] = lossID
             self.losstableAgg["lossID"] = lossID
             self.losstable.to_sql(
-                losstable, engine, self.schema, if_exists='append', index=False)
+                losstable, engine, self.organizationSchema, if_exists='append', index=False)
             self.losstableAgg.to_sql(
-                loss_table_agg, engine, self.schema, if_exists='append', index=False)
+                loss_table_agg, engine, self.organizationSchema, if_exists='append', index=False)
         else:
             self.losstable["lossID"] = lossID
             self.losstable.to_sql(
-                losstable, engine, self.schema, if_exists='append', index=False)
+                losstable, engine, self.organizationSchema, if_exists='append', index=False)
 
 
-def main(exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, costColumn, typeColumn, aggrigationColumn, vulnColn, schema, earSchema, connstr, cal_type, preaggregated, lossid, losstable, aggregate, aggregateon=None):
+def main(exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, costColumn, typeColumn, aggrigationColumn, vulnColn, schema, organizationSchema, connstr, cal_type, preaggregated, lossid, losstable, aggregate, aggregateon=None):
     lossA = Loss(exposureID, exposureIndexTableName, hazardIndexTableName,
                  earIndexTableName, costColumn, typeColumn, aggrigationColumn, vulnColn, schema)
     lossA.createCon(connstr)
@@ -265,14 +265,14 @@ typeColumn = "type"
 aggrigationColumn = "admin_unit"
 vulnColn = "Flash flood"
 schema = "public"
-earSchema = 'geoinformatics_center'
+organizationSchema = 'geoinformatics_center'
 
 
 # In[9]:
 
 
 lossA = Loss(exposureID, exposureIndexTableName, hazardIndexTableName,
-             earIndexTableName, costColumn, typeColumn, aggrigationColumn, vulnColn, schema, earSchema)
+             earIndexTableName, costColumn, typeColumn, aggrigationColumn, vulnColn, schema, organizationSchema)
 
 
 # In[10]:
@@ -286,6 +286,6 @@ lossA.getEarData()
 lossA.getExposureData()
 lossA.getHazardMeanIntensity()
 lossA.getVulnerability("Intensity")
-lossA.computeLoss(False)
-lossA.saveLoss("postgresql://postgres:gicait123@203.159.29.45:5432/sdssv2",
-               565, 'random_loss', False)
+# lossA.computeLoss(False)
+# lossA.saveLoss("postgresql://postgres:gicait123@203.159.29.45:5432/sdssv2",
+#                565, 'random_loss', False)
