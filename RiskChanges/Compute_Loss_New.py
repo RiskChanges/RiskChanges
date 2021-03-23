@@ -31,7 +31,7 @@ def get_random_string(length):
 
 
 class Loss:
-    def __init__(self, exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, costColumn, typeColumn, aggrigationColumn, vulnColn, schema, organizationSchema):
+    def __init__(self, exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, costColumn, aggrigationColumn, vulnColn, schema, organizationSchema):
         self.exposureID = exposureID
         self.exposureIndexTableName = exposureIndexTableName
         self.hazardIndexTableName = hazardIndexTableName
@@ -221,9 +221,9 @@ class Loss:
                 losstable, engine, self.organizationSchema, if_exists='append', index=False)
 
 
-def main(exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, costColumn, typeColumn, aggrigationColumn, vulnColn, schema, organizationSchema, connstr, cal_type, preaggregated, lossid, losstable, aggregate, aggregateon=None):
+def main(exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, costColumn, aggrigationColumn, vulnColn, schema, organizationSchema, connstr, cal_type, preaggregated, lossid, losstable, aggregate, aggregateon=None):
     lossA = Loss(exposureID, exposureIndexTableName, hazardIndexTableName,
-                 earIndexTableName, costColumn, typeColumn, aggrigationColumn, vulnColn, schema)
+                 earIndexTableName, costColumn, aggrigationColumn, vulnColn, schema)
     lossA.createCon(connstr)
     lossA.getExposureMeta()
     lossA.getEarTableMeta(cal_type)
@@ -261,7 +261,6 @@ exposureIndexTableName = "exposure_exposureindex"
 earIndexTableName = "projectIndex_earindex"
 hazardIndexTableName = "projectIndex_hazardindex"
 costColumn = "value"
-typeColumn = "type"
 aggrigationColumn = "admin_unit"
 vulnColn = "Flash flood"
 schema = "public"
@@ -272,7 +271,7 @@ organizationSchema = 'geoinformatics_center'
 
 
 lossA = Loss(exposureID, exposureIndexTableName, hazardIndexTableName,
-             earIndexTableName, costColumn, typeColumn, aggrigationColumn, vulnColn, schema, organizationSchema)
+             earIndexTableName, costColumn, aggrigationColumn, vulnColn, schema, organizationSchema)
 
 
 # In[10]:
