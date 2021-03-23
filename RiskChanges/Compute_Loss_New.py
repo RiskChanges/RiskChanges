@@ -139,8 +139,8 @@ class Loss:
         if haztype == "Intensity":
             final_df = pd.DataFrame()
             for i in self.exposuretable[self.vulnColumn].unique():
-                sql_vul_vals = 'SELECT * FROM public."projectIndex_vulvalues" WHERE "vulnID_fk_id"=' + \
-                    str(i)
+                sql_vul_vals = '''SELECT * FROM public."projectIndex_vulvalues" WHERE "vulnID_fk_id"={}'''.format(
+                    str(i))
                 vulnerbaility = pd.read_sql_query(sql_vul_vals, self.Con)
                 vulnerbaility['mean_x'] = vulnerbaility.apply(lambda row: (
                     row.hazIntensity_from+row.hazIntensity_to)/2, axis=1)
@@ -163,11 +163,11 @@ class Loss:
 
         elif haztype == "susceptibility":
             for i in self.exposuretable[self.vulnColumn].unique():
-                sql_vul_vals = 'SELECT * FROM public."vulnerabilityPoints" WHERE "vulnID_fk"=' + \
-                    str(i)
+                sql_vul_vals = '''SELECT * FROM public."projectIndex_vulvalues" WHERE "vulnID_fk_id" ={}'''.format(
+                    str(i))
                 vulnerbaility = pd.read_sql_query(sql_vul_vals, self.Con)
                 subset_exp = self.exposuretable[self.exposuretable[self.vulnColumn] == i]
-                # subset_exp["vuln"]
+
                 subset_exp = pd.merge(left=subset_exp, right=vulnerbaility[[
                                       'vulnAVG', 'hazIntensity_to']], how='left', left_on=['class'], right_on=['hazIntensity_to'])
                 subset_exp.drop(columns=['hazIntensity_to'])
@@ -177,11 +177,6 @@ class Loss:
             self.exposuretable = final_df
 
     def spatial_overlay(self, aggregateon):
-        sql_agg = 'SELECT '+self.earTable+'.*,'+aggregateon+'.'+self.aggrigationColumn + ' FROM ' + self.earTable + \
-            ' , '+aggregateon + \
-            ' WHERE ST_Intersects( ' + self.earTable + \
-            '.geom , '+aggregateon+'.geom )'
-
         sql_agg = '''SELECT {0}.* {1}.{2} FROM {0}, {1} WHERE ST_Intersects({0}.geom, {1}.geom)'''.format(
             self.earTable, aggregateon, aggrigationColumn)
 
@@ -196,6 +191,7 @@ class Loss:
             if 'admin_unit' not in self.exposuretable.columns:
                 raise ValueError(
                     "Aggregation must required in the exposure table")
+
             self.exposuretable['loss'] = self.exposuretable.apply(
                 lambda row: row[self.costColumn]*row.exposed*row.vuln*self.spprob/100, axis=1)
             self.losstable = self.exposuretable.groupby(
@@ -205,6 +201,7 @@ class Loss:
         else:
             self.exposuretable['loss'] = self.exposuretable.apply(
                 lambda row: row[self.costColumn]*row.exposed*row.vuln*self.spprob/100, axis=1)
+
             self.losstable = self.exposuretable.groupby(
                 ["id"], as_index=False).agg({'loss': 'sum'})
 
