@@ -31,7 +31,7 @@ def get_random_string(length):
 
 
 class Loss:
-    def __init__(self, exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, costColumn, aggrigationColumn, vulnColn, schema, organizationSchema):
+    def __init__(self, exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, aggrigationColumn, vulnColn, schema, organizationSchema):
         self.exposureID = exposureID
         self.exposureIndexTableName = exposureIndexTableName
         self.hazardIndexTableName = hazardIndexTableName
@@ -46,7 +46,7 @@ class Loss:
         self.hazIndex = None
         self.earIndex = None
         self.exposureTable = None
-        self.costColumn = costColumn  # get from dbase make it none
+        self.costColumn = None
         self.typeColumn = None  # get from dbase make it none
         self.eartable = None
         self.exposuretable = None
@@ -100,7 +100,7 @@ class Loss:
 
         sql_haz = '''SELECT * FROM "{}"."{}" WHERE id={}'''.format(
             self.schema, self.hazardIndexTableName, str(self.hazIndex))
-        haz_meta = pd.read_sql_query(sql_ear, self.Con)
+        haz_meta = pd.read_sql_query(sql_haz, self.Con)
 
         self.hazunit = haz_meta['unit'][0]
         self.intensity = haz_meta['intensity'][0]
@@ -221,9 +221,9 @@ class Loss:
                 losstable, engine, self.organizationSchema, if_exists='append', index=False)
 
 
-def main(exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, costColumn, aggrigationColumn, vulnColn, schema, organizationSchema, connstr, cal_type, preaggregated, lossid, losstable, aggregate, aggregateon=None):
+def main(exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, aggrigationColumn, vulnColn, schema, organizationSchema, connstr, cal_type, preaggregated, lossid, losstable, aggregate, aggregateon=None):
     lossA = Loss(exposureID, exposureIndexTableName, hazardIndexTableName,
-                 earIndexTableName, costColumn, aggrigationColumn, vulnColn, schema)
+                 earIndexTableName, aggrigationColumn, vulnColn, schema)
     lossA.createCon(connstr)
     lossA.getExposureMeta()
     lossA.getEarTableMeta(cal_type)
@@ -260,7 +260,6 @@ exposureID = 320
 exposureIndexTableName = "exposure_exposureindex"
 earIndexTableName = "projectIndex_earindex"
 hazardIndexTableName = "projectIndex_hazardindex"
-costColumn = "value"
 aggrigationColumn = "admin_unit"
 vulnColn = "Flash flood"
 schema = "public"
@@ -271,7 +270,7 @@ organizationSchema = 'geoinformatics_center'
 
 
 lossA = Loss(exposureID, exposureIndexTableName, hazardIndexTableName,
-             earIndexTableName, costColumn, aggrigationColumn, vulnColn, schema, organizationSchema)
+             earIndexTableName, aggrigationColumn, vulnColn, schema, organizationSchema)
 
 
 # In[10]:
@@ -280,11 +279,11 @@ lossA = Loss(exposureID, exposureIndexTableName, hazardIndexTableName,
 lossA.createCon("postgresql://postgres:gicait123@203.159.29.45:5432/sdssv2")
 lossA.getExposureMeta()
 lossA.getEarTableMeta('value')
-# lossA.getHazardMeta()
+lossA.getHazMeta()
 lossA.getEarData()
 lossA.getExposureData()
 lossA.getHazardMeanIntensity()
 lossA.getVulnerability("Intensity")
-# lossA.computeLoss(False)
-# lossA.saveLoss("postgresql://postgres:gicait123@203.159.29.45:5432/sdssv2",
-#                565, 'random_loss', False)
+lossA.computeLoss(False)
+lossA.saveLoss("postgresql://postgres:gicait123@203.159.29.45:5432/sdssv2",
+               565, 'random_loss', False)
