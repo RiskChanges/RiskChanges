@@ -31,7 +31,7 @@ def get_random_string(length):
 
 
 class Loss:
-    def __init__(self, exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, aggrigationColumn, vulnColn, schema, organizationSchema):
+    def __init__(self, exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName, aggrigationColumn, vulnColn, schema, organizationSchema, progress_recorder=False):
         self.exposureID = exposureID
         self.exposureIndexTableName = exposureIndexTableName
         self.hazardIndexTableName = hazardIndexTableName
@@ -45,6 +45,7 @@ class Loss:
         self.earPK = None
         self.hazIndex = None
         self.earIndex = None
+        self.progress_recorder = progress_recorder
         self.exposureTable = None
         self.costColumn = None
         self.typeColumn = None  # get from dbase make it none
@@ -139,6 +140,11 @@ class Loss:
         if haztype == "Intensity":
             final_df = pd.DataFrame()
             for i in self.exposuretable[self.vulnColumn].unique():
+
+                if progress_recorder:
+                    progress_recorder.set_progress(
+                        i, self.exposuretable[self.vulnColumn].unique())
+
                 sql_vul_vals = '''SELECT * FROM public."projectIndex_vulvalues" WHERE "vulnID_fk_id"={}'''.format(
                     str(i))
                 vulnerbaility = pd.read_sql_query(sql_vul_vals, self.Con)
@@ -162,6 +168,11 @@ class Loss:
 
         elif haztype == "susceptibility":
             for i in self.exposuretable[self.vulnColumn].unique():
+
+                if progress_recorder:
+                    progress_recorder.set_progress(
+                        i, self.exposuretable[self.vulnColumn].unique())
+
                 sql_vul_vals = '''SELECT * FROM public."projectIndex_vulvalues" WHERE "vulnID_fk_id" ={}'''.format(
                     str(i))
                 vulnerbaility = pd.read_sql_query(sql_vul_vals, self.Con)
@@ -279,7 +290,7 @@ lossA = Loss(exposureID, exposureIndexTableName, hazardIndexTableName,
 lossA.createCon("postgresql://postgres:gicait123@203.159.29.45:5432/sdssv2")
 lossA.getExposureMeta()
 lossA.getEarTableMeta('value')
-lossA.getHazMeta()
+# lossA.getHazMeta()
 lossA.getEarData()
 lossA.getExposureData()
 lossA.getHazardMeanIntensity()
