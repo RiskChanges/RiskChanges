@@ -141,8 +141,8 @@ class Loss:
             final_df = pd.DataFrame()
             for i in self.exposuretable[self.vulnColumn].unique():
 
-                if progress_recorder:
-                    progress_recorder.set_progress(
+                if self.progress_recorder:
+                    self.progress_recorder.set_progress(
                         i, self.exposuretable[self.vulnColumn].unique())
 
                 sql_vul_vals = '''SELECT * FROM public."projectIndex_vulvalues" WHERE "vulnID_fk_id"={}'''.format(
@@ -169,8 +169,8 @@ class Loss:
         elif haztype == "susceptibility":
             for i in self.exposuretable[self.vulnColumn].unique():
 
-                if progress_recorder:
-                    progress_recorder.set_progress(
+                if self.progress_recorder:
+                    self.progress_recorder.set_progress(
                         i, self.exposuretable[self.vulnColumn].unique())
 
                 sql_vul_vals = '''SELECT * FROM public."projectIndex_vulvalues" WHERE "vulnID_fk_id" ={}'''.format(
@@ -262,39 +262,3 @@ def main(exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTable
 # if __name__ == '__main__':
 #     main(exposureID, exposureIndexTableName, hazardIndexTableName, earIndexTableName,
 #          costColumn, typeColumn, aggrigationColumn, vulnColn, Schema, connstr)
-
-
-# In[8]:
-
-
-exposureID = 320
-exposureIndexTableName = "exposure_exposureindex"
-earIndexTableName = "projectIndex_earindex"
-hazardIndexTableName = "projectIndex_hazardindex"
-aggrigationColumn = "admin_unit"
-vulnColn = "Flash flood"
-schema = "public"
-organizationSchema = 'geoinformatics_center'
-
-
-# In[9]:
-
-
-lossA = Loss(exposureID, exposureIndexTableName, hazardIndexTableName,
-             earIndexTableName, aggrigationColumn, vulnColn, schema, organizationSchema)
-
-
-# In[10]:
-
-
-lossA.createCon("postgresql://postgres:gicait123@203.159.29.45:5432/sdssv2")
-lossA.getExposureMeta()
-lossA.getEarTableMeta('value')
-# lossA.getHazMeta()
-lossA.getEarData()
-lossA.getExposureData()
-lossA.getHazardMeanIntensity()
-lossA.getVulnerability("Intensity")
-lossA.computeLoss(False)
-lossA.saveLoss("postgresql://postgres:gicait123@203.159.29.45:5432/sdssv2",
-               565, 'random_loss', False)
