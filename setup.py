@@ -2,7 +2,7 @@ from distutils.core import setup
 setup(
   name = 'RiskChanges',         # How you named your package folder (MyLib)
   packages = ['RiskChanges'],   # Chose the same as "name"
-  version = '1.96',      # Start with a small number and increase it with every change you make
+  version = '2.0',      # Start with a small number and increase it with every change you make
   license='cc-by-4.0',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
   description = 'Library for computation of Loss and risk for Changing Natural Hazards',   # Give a short description about your library
   author = 'Ashok Dahal ',                   # Type in your name
@@ -31,5 +31,7 @@ setup(
     'Programming Language :: Python :: 3.4',
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
   ],
 )
