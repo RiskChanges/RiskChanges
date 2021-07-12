@@ -1,14 +1,12 @@
-from RiskChangesOps.readraster import readhaz
-from RiskChangesOps.readvector import readear
-import RiskChangesOps.readmeta as readmeta
-import RiskChangesOps.rasterops as rasterops
-import RiskChangesOps.vectorops as vectorops
-import RiskChangesOps.writevector as writevector
 import pandas as pd
 import numpy as np
 import numpy.ma as ma
 import geopandas as gpd
-import RiskChangesOps.AggregateData as aggregator
+
+from .RiskChangesOps import rasterops, vectorops, writevector, AggregateData as aggregator
+from .RiskChangesOps.readraster import readhaz
+from .RiskChangesOps.readvector import readear
+from .RiskChangesOps import readmeta
 
 def polygonExposure(ear,haz,expid,Ear_Table_PK):
     df=pd.DataFrame()

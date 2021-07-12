@@ -1,4 +1,4 @@
-import RiskChangesOps.readmeta as readmeta
+from . import readmeta 
 import rasterio
 import numpy as np
 

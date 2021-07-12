@@ -1,6 +1,5 @@
 import geopandas as gpd
-import RiskChangesOps.readmeta as readmeta
-import RiskChangesOps.readvulnerability as readvulnerability
+from . import readmeta
 import psycopg2
 import pandas as pd 
 def readear(connstr,earid):
