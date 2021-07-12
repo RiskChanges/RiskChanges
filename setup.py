@@ -1,7 +1,7 @@
 from distutils.core import setup
 setup(
   name = 'RiskChanges',         # How you named your package folder (MyLib)
-  packages = ['RiskChanges'],   # Chose the same as "name"
+  packages = ['RiskChanges', "RiskChanges.DataManage", "RiskChanges.RiskChangesOps"],   # Chose the same as "name"
   version = '2.0',      # Start with a small number and increase it with every change you make
   license='cc-by-4.0',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
   description = 'Library for computation of Loss and risk for Changing Natural Hazards',   # Give a short description about your library

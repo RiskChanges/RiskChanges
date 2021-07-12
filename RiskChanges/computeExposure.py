@@ -1,5 +1,3 @@
-from RiskChanges.RiskChangesOps.AggregateData import aggregateexpoure
-from pandas.core import base
 from RiskChangesOps.readraster import readhaz
 from RiskChangesOps.readvector import readear
 import RiskChangesOps.readmeta as readmeta
