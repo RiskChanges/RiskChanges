@@ -34,7 +34,7 @@ import geopandas as gpd
 # In[69]:
 
 
-def loadshp(shpInput,connstr,lyrName,schema='public'):  
+def loadshp(shpInput,connstr,lyrName,schema='public', index=None):  
     #Load data in geodataframe
     geodataframe = geopandas.read_file(shpInput) 
     
@@ -50,6 +50,8 @@ def loadshp(shpInput,connstr,lyrName,schema='public'):
     #print(geom_type)
     # Creating SQLAlchemy's engine to use
     engine = create_engine(connstr)
+
+    geodataframe['index'] = index
     
     #... [do something with the geodataframe]
 
