@@ -1,7 +1,7 @@
 from . import readmeta 
 import rasterio
 import numpy as np
-
+import os
 def reclassify(in_image,out_image,base,stepsize):
     input_image=rasterio.open(in_image)
     intensity_data=input_image.read(1)
@@ -32,7 +32,10 @@ def reclassify(in_image,out_image,base,stepsize):
 def ClassifyHazard(hazard_file,base,stepsize):
     infile=hazard_file
     outfile=hazard_file.replace(".tif","_reclassified.tif")
-    reclassify(infile,outfile,base,stepsize)
+    if  os.path.isfile(outfile):
+        pass
+    else:
+        reclassify(infile,outfile,base,stepsize)
     return outfile
 
 def readhaz(connstr,hazid, haz_file):
@@ -40,9 +43,15 @@ def readhaz(connstr,hazid, haz_file):
     base=hazard_metadata.base_val[0]
     step_size=hazard_metadata.interval_val[0]
     hazfile=hazard_metadata.file[0]
+    intensity_type=hazard_metadata.intensity[0]
     if haz_file:
         hazfile = haz_file
-    outfile=ClassifyHazard(hazfile,base,step_size)
+        
+    if intensity_type=='Susceptibility':
+        outfile=hazfile
+    else:
+        outfile=ClassifyHazard(hazfile,base,step_size)
+        
     src=rasterio.open(outfile)
     return src
 
