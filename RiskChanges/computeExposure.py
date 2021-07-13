@@ -1,14 +1,12 @@
-from RiskChangesOps.readraster import readhaz
-from RiskChangesOps.readvector import readear
-import RiskChangesOps.readmeta as readmeta
-import RiskChangesOps.rasterops as rasterops
-import RiskChangesOps.vectorops as vectorops
-import RiskChangesOps.writevector as writevector
 import pandas as pd
 import numpy as np
 import numpy.ma as ma
 import geopandas as gpd
-import RiskChangesOps.AggregateData as aggregator
+
+from .RiskChangesOps import rasterops, vectorops, writevector, AggregateData as aggregator
+from .RiskChangesOps.readraster import readhaz
+from .RiskChangesOps.readvector import readear
+from .RiskChangesOps import readmeta
 
 def polygonExposure(ear,haz,expid,Ear_Table_PK):
     df=pd.DataFrame()
@@ -119,15 +117,13 @@ def pointExposure(ear,haz,expid,Ear_Table_PK):
 
 
 def ComputeExposure(con,earid,hazid,expid,**kwargs):
-    try:
-        is_aggregated=kwargs['is_aggregated']
-        onlyaggregated=kwargs['only_aggregated']
-        adminid=kwargs['adminunit_id']
-    except:
-        is_aggregated= False
-        onlyaggregated= False
+    is_aggregated = kwargs.get('is_aggregated', False)
+    onlyaggregated = kwargs.get('only_aggregated', False)
+    adminid = kwargs.get('adminunit_id', None)
+    haz_file = kwargs.get('haz_file', None)
+    
     ear=readear(con,earid)
-    haz=readhaz(con,hazid)
+    haz=readhaz(con,hazid, haz_file)
     assert vectorops.cehckprojection(ear,haz), "The hazard and EAR do not have same projection system please check it first"
     metatable=readmeta.earmeta(con,earid)
     Ear_Table_PK=metatable.data_id[0]

@@ -1,5 +1,3 @@
-import RiskChangesOps.readmeta as readmeta
-import RiskChangesOps.readvector as readvector
 import geopandas as gpd
 import pandas as pd
 
