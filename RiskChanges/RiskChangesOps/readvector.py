@@ -2,6 +2,8 @@ import geopandas as gpd
 from . import readmeta
 import psycopg2
 import pandas as pd 
+
+
 def readear(connstr,earid):
     engine=psycopg2.connect(connstr)
     metatable=readmeta.earmeta(connstr,earid)
@@ -13,6 +15,8 @@ def readear(connstr,earid):
     ear_table=gpd.read_postgis(sql,con=engine)
     engine.close()
     return ear_table
+
+
 def readexposure(connstr,exposureid,schema):
     engine=psycopg2.connect(connstr)
     metatable=readmeta.exposuremeta(connstr,exposureid)
@@ -30,7 +34,7 @@ def prepareExposureForLoss(connstr,exposureid):
     pk=metadict["earPK"]
     exposuredata=readexposure(connstr,exposureid,schema)
     eardatageom=readear(connstr,earid)
-    eardata=df1 = pd.DataFrame(gdf.drop(columns='geom'))
+    eardata=pd.DataFrame(eardatageom.drop(columns='geom'))
     exposure_all=pd.merge(left=exposuredata, right=eardata, how='left', left_on=['geom_id'], right_on=[pk])
     assert not exposure_all.empty , f"The exposure data  {exposureid} returned empty from database"
     #exposure=readvulnerability.linkvulnerability(connstr,exposure_all)

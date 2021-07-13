@@ -1,9 +1,11 @@
-import RiskChangesOps.readmeta as readmeta
-from RiskChangesOps.readvulnerability import readIntVuln,readSusVuln
-import RiskChangesOps.readvector as readvector
-import RiskChangesOps.writevector as writevector
 import geopandas as gpd
-import RiskChangesOps.AggregateData as aggregator
+import pandas as pd
+
+from .RiskChangesOps.readvulnerability import readIntVuln,readSusVuln
+from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
+
+
+
 def getHazardMeanIntensity(exposuretable,stepsize,base):
     stepsize=stepsize#5 #import from database
     base=base#0 #import from database
@@ -52,13 +54,9 @@ def calculateLoss_spprob(exposuretable,costColumn,spprob):
     return losstable_lossonly
 
 def ComputeLoss(con,exposureid,lossid,computeonvalue=True,**kwargs):
-    try:
-        is_aggregated=kwargs['is_aggregated']
-        onlyaggregated=kwargs['only_aggregated']
-        adminid=kwargs['adminunit_id']
-    except:
-        is_aggregated= False
-        onlyaggregated= False
+    is_aggregated = kwargs.get('is_aggregated', False)
+    onlyaggregated = kwargs.get('only_aggregated', False)
+    adminid = kwargs.get('adminunit_id', None)
 
     metadata=readmeta.computeloss_meta(con,exposureid)
     exposure=readvector.prepareExposureForLoss(con,exposureid)
@@ -86,7 +84,7 @@ def ComputeLoss(con,exposureid,lossid,computeonvalue=True,**kwargs):
         writevector.writeLoss(loss,con,schema)
 
     if is_aggregated:
-        admin_unit=readear.readAdmin(con,adminid)
+        admin_unit=readvector.readAdmin(con,adminid)
         earid=metadata["earID"]
         ear= readvector.readear(con,earid)
         loss=pd.merge(left=loss, right=ear['id','geom'], left_on='geom_id',right_on='id',right_index=False)
