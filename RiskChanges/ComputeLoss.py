@@ -91,7 +91,7 @@ def ComputeLoss(con,exposureid,lossid,computeonvalue=True,**kwargs):
         loss=pd.merge(left=loss, right=ear['id','geom'], left_on='geom_id',right_on='id',right_index=False)
         loss= gpd.GeoDataFrame(loss,geometry='geom')
         loss=aggregator.aggregateloss(loss,admin_unit)
-        writevector.writeLossAgg(df,con,schema)
+        writevector.writeLossAgg(loss,con,schema)
 
 
 
