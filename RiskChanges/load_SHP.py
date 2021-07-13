@@ -37,7 +37,7 @@ def loadshp(shpInput,connstr,lyrName,schema, index):
     # Creating SQLAlchemy's engine to use
     engine = create_engine(connstr)
 
-    geodataframe['id'] = index
+    geodataframe[index] = geodataframe.index
     
     #... [do something with the geodataframe]
 

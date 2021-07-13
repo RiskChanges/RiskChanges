@@ -1,5 +1,6 @@
 import geopandas as gpd
 import pandas as pd
+import numpy as np
 
 from .RiskChangesOps.readvulnerability import readIntVuln,readSusVuln
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
