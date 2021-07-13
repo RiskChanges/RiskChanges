@@ -103,6 +103,8 @@ def lineExposure(ear,haz,expid,Ear_Table_PK):
 
 
 def pointExposure(ear,haz,expid,Ear_Table_PK):
+    df=pd.DataFrame()
+    df_temp=pd.DataFrame()
     for ind,row in ear.iterrows():
         coords = [(x,y) for x, y in zip(row.geom.x, row.geom.y)]
         a =haz.sample(coords)   
@@ -148,8 +150,9 @@ def ComputeExposure(con,earid,hazid,expid,**kwargs):
     if not onlyaggregated:
         writevector.writeexposure(df,con,schema)
     if is_aggregated:
-        admin_unit=readAdmin(con,adminid)
-        df=pd.merge(left=df, right=ear['id','geom'], left_on='geom_id',right_on='id',right_index=False)
+        admin_unit=readAdmin(con,adminid)        
+        df=pd.merge(left=df, right=ear[['id','geom']], left_on='geom_id',right_on='id',right_index=False)
+
         df= gpd.GeoDataFrame(df,geometry='geom')
         df=aggregator.aggregateexpoure(df,admin_unit)
         writevector.writeexposureAgg(df,con,schema)

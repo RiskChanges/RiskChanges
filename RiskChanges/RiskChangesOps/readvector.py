@@ -58,7 +58,7 @@ def readRiskGeometry(connstr,riskid):
     meta=readmeta.getRiskMeta(connstr,riskid)
     earid=meta.earid[0]
     schema=meta.workspace[0]
-    risktable=metatable.risk_table[0]
+    risktable=meta.risk_table[0]
     sql=f'SELECT * FROM {schema}."{risktable}" as risktable WHERE risktable.loss_id={riskid};'
     #print(sql)
     risk_table=pd.read_sql(sql,con=engine)
