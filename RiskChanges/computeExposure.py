@@ -151,7 +151,7 @@ def ComputeExposure(con,earid,hazid,expid,**kwargs):
         writevector.writeexposure(df,con,schema)
     if is_aggregated:
         admin_unit=readear.readAdmin(con,adminid)
-        df=pd.merge(left=df, right=ear['id','geom'], left_on='geom_id',right_on='id',right_index=False)
+        df=pd.merge(left=df, right=ear[['id','geom']], left_on='geom_id',right_on='id',right_index=False)
         df= gpd.GeoDataFrame(df,geometry='geom')
         df=aggregator.aggregateexpoure(df,admin_unit)
         writevector.writeexposureAgg(df,con,schema)
