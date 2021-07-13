@@ -117,15 +117,13 @@ def pointExposure(ear,haz,expid,Ear_Table_PK):
 
 
 def ComputeExposure(con,earid,hazid,expid,**kwargs):
-    try:
-        is_aggregated=kwargs['is_aggregated']
-        onlyaggregated=kwargs['only_aggregated']
-        adminid=kwargs['adminunit_id']
-    except:
-        is_aggregated= False
-        onlyaggregated= False
+    is_aggregated = kwargs.get('is_aggregated', False)
+    onlyaggregated = kwargs.get('only_aggregated', False)
+    adminid = kwargs.get('adminunit_id', None)
+    haz_file = kwargs.get('haz_file', None)
+    
     ear=readear(con,earid)
-    haz=readhaz(con,hazid)
+    haz=readhaz(con,hazid, haz_file)
     assert vectorops.cehckprojection(ear,haz), "The hazard and EAR do not have same projection system please check it first"
     metatable=readmeta.earmeta(con,earid)
     Ear_Table_PK=metatable.data_id[0]

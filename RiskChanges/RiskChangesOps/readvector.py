@@ -5,7 +5,7 @@ import pandas as pd
 def readear(connstr,earid):
     engine=psycopg2.connect(connstr)
     metatable=readmeta.earmeta(connstr,earid)
-    eartablename=metatable.table_name[0]
+    eartablename=metatable.layer_name[0]
     schema=metatable.workspace[0]
     
     sql=f'SELECT * FROM {schema}."{eartablename}";'
