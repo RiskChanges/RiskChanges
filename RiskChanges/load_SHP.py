@@ -12,29 +12,14 @@
 
 
 import geopandas
-import numpy
-import os
-import sys
-from rasterstats import zonal_stats
-from shapely.geometry import LineString
-from shapely import wkt
-from owslib.wcs import WebCoverageService 
-
-
-# In[8]:
-
-
-# Imports
 from geoalchemy2 import Geometry, WKTElement
 from sqlalchemy import *
-import pandas as pd
-import geopandas as gpd
 
 
 # In[69]:
 
 
-def loadshp(shpInput,connstr,lyrName,schema):  
+def loadshp(shpInput,connstr,lyrName,schema, index):  
     #Load data in geodataframe
     geodataframe = geopandas.read_file(shpInput) 
     
@@ -51,6 +36,8 @@ def loadshp(shpInput,connstr,lyrName,schema):
     
     # Creating SQLAlchemy's engine to use
     engine = create_engine(connstr)
+
+    geodataframe['id'] = index
     
     #... [do something with the geodataframe]
 
