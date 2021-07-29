@@ -27,6 +27,18 @@ def readexposure(connstr,exposureid,schema):
     engine.close()
     return exposure_table
 
+def readexposureGeom(connstr,exposureid):
+    metadict=readmeta.computeloss_meta(connstr,exposureid)
+    schema=metadict["Schema"]
+    earid=metadict["earID"]
+    pk=metadict["earPK"]
+    exposuredata=readexposure(connstr,exposureid,schema)
+    eardatageom=readear(connstr,earid) #joining on geom_id and pk so change it to joinincol
+    eardatageom=eardatageom.rename(columns={pk:'joining_id'})
+    exposuredata=exposuredata.rename(columns={'geom_id':'joining_id'})
+    exposuredata_geom = eardatageom.merge(exposuredata, on='joining_id')
+    return exposuredata_geom
+
 def prepareExposureForLoss(connstr,exposureid):
     metadict=readmeta.computeloss_meta(connstr,exposureid)
     schema=metadict["Schema"]
@@ -52,6 +64,21 @@ def readLoss(connstr,lossid):
     loss_table=pd.read_sql(sql,con=engine)
     engine.close()
     return loss_table
+
+def readLossGeom(connstr,lossid):
+    loss=readLoss(connstr,lossid)
+    meta=readmeta.readLossMeta(connstr,lossid)
+    earid=meta.earid[0]
+    eardatageom=readear(connstr,earid)
+    metataear=readmeta.earmeta(connstr,earid)
+    pk=metataear.earPK[0]
+    eardatageom=eardatageom.rename(columns={pk:'joining_id'})
+    loss=loss.rename(columns={'geom_id':'joining_id'})
+    lossdata_geom = eardatageom.merge(loss, on='joining_id')
+    assert not lossdata_geom.empty , f"The loss data  {lossid} returned empty from database"
+    return lossdata_geom
+
+
 
 def readRiskGeometry(connstr,riskid):
     engine=psycopg2.connect(connstr)
