@@ -192,7 +192,11 @@ def calculateRisk(lossdf,columns, probs):
     return risktable
 
 
-def computeMulRisk(connstr,losscombinations,hazardinteractions,extensions,riskid,**kwargs): #pass dictionaries of loss and hazard combinations. losscombiations can be like this {'flood':[5,6,1],'earthquake':[8,4,9]} interactions can be {'independent':[('eartqhuake','flood'),('earthquake','debrisflow')],'cascading':[('landslide','flood')],'cascading_weights':[(1,0.5)]}. extensions provide information on how to extend the datasets it should be like this {'earthquake':{'left':[(x1,y1),(x2,y2)], 'right':[(a1,b1),(a2,b2)]}, 'flood':{'left':[(x1,y1),(x2,y2)], 'right':[(a1,b1),(a2,b2)]}}
+def computeMulRisk(connstr,groupcombinations,extensions,riskid,**kwargs): #pass dictionaries of loss and hazard combinations. losscombiations can be like this {'flood':[5,6,1],'earthquake':[8,4,9]} interactions can be {'independent':[('eartqhuake','flood'),('earthquake','debrisflow')],'cascading':[('landslide','flood')],'cascading_weights':[(1,0.5)]}. extensions provide information on how to extend the datasets it should be like this {'earthquake':{'left':[(x1,y1),(x2,y2)], 'right':[(a1,b1),(a2,b2)]}, 'flood':{'left':[(x1,y1),(x2,y2)], 'right':[(a1,b1),(a2,b2)]}}
+    #UPDATE: group combinations are just combinationsof group like this
+    #{'group1':[{'flood':[5,6,1],'earthquake':[8,4,9]},{'independent':[('eartqhuake','flood'),('earthquake','debrisflow')],'cascading':[('landslide','flood')],'cascading_weights':[(1,0.5)]}]}
+    #Where group is a specific group of hazards which do not repeat and can be added in later stage. 
+    #the first element in list represents the combinations of lossids and seond one represents the hazard interactions ALWAYS IN THAT WAY
     try:
         is_aggregated=kwargs['is_aggregated']
         onlyaggregated=kwargs['only_aggregated']
@@ -200,72 +204,85 @@ def computeMulRisk(connstr,losscombinations,hazardinteractions,extensions,riskid
     except:
         is_aggregated= False
         onlyaggregated= False
-    
-    loss_normalization={}
-    first=True
-    
-    for hazard in losscombinations:
-        Name_hazard=hazard
-        lossids=losscombinations[hazard]
-        extention=extensions[hazard]
-        normalized_loss,cols,probs=PrepareLossForRisk(connstr, lossids,extention,hazard)
-        loss_haz={'normalized_loss':normalized_loss,'cols':cols,'probs':probs}
-        loss_normalization[hazard]=loss_haz
-    for interaction in hazardinteractions:
-        interacting_hazards=hazardinteractions[interaction]
-        if (interaction=='cascading') | (interaction=='conditional'):
-            try:
-                haz_prob=hazardinteractions[interaction+'_weights']
-            except:
-                raise ValueError('the hazard weights for cascading and conditional interaction in all the hazards are not provided use 1 if it is not available')
-        else:
-            haz_prob = [(1,1)]
-            haz_prob = haz_prob*len(interacting_hazards)
+    first_risk=True
+    for group in groupcombinations:
+        losscombinations=groupcombinations[group][0]
+        hazardinteractions=groupcombinations[group][1]
+        loss_normalization={}
+        first=True
+        
+        for hazard in losscombinations:
+            Name_hazard=hazard
+            lossids=losscombinations[hazard]
+            extention=extensions[hazard]
+            normalized_loss,cols,probs=PrepareLossForRisk(connstr, lossids,extention,hazard)
+            loss_haz={'normalized_loss':normalized_loss,'cols':cols,'probs':probs}
+            loss_normalization[hazard]=loss_haz
+        for interaction in hazardinteractions:
+            interacting_hazards=hazardinteractions[interaction]
+            if (interaction=='cascading') | (interaction=='conditional'):
+                try:
+                    haz_prob=hazardinteractions[interaction+'_weights']
+                except:
+                    raise ValueError('the hazard weights for cascading and conditional interaction in all the hazards are not provided use 1 if it is not available')
+            else:
+                haz_prob = [(1,1)]
+                haz_prob = haz_prob*len(interacting_hazards)
 
-        if len(interacting_hazards)==0:
-            continue
-        elif len(interacting_hazards)==1:
-            combined_loss=combineLosses(loss_normalization,interacting_hazards[0],interaction,haz_prob[0])
-        else :
-            second=True
-            for single_interaction in interacting_hazards:
-                index_nm=interacting_hazards.index(single_interaction)
-                combined_loss_step=combineLosses(loss_normalization,single_interaction,interaction,haz_prob[index_nm])
-                if second:
-                    combined_loss=combined_loss_step
-                    second=False
-                else:
-                    cols=combined_loss_step.columns.tolist()
-                    cols_selected=[word for word in cols if ('combined' in word)]
-                    merged=pd.merge(left=combined_loss,right=combined_loss_step,how='outer',left_on=['Unit_ID'], right_on=['Unit_ID'],right_index=False,suffixes=('_left', '_right'))
-                    del combined_loss,combined_loss_step
-                    merged_cols=merged.columns.tolist()
-                    for col in cols_selected:
-                        merged_selected=[word for word in merged_cols if (col in word)]
-                        merged[col]=merged[merged_selected].sum(axis=1)
-                        merged=merged.drop(columns=[merged_selected])
-                    combined_loss=merged
-                # do same as in above steps
-        if first:
-            final_loss=combined_loss
-            first=False
+            if len(interacting_hazards)==0:
+                continue
+            elif len(interacting_hazards)==1:
+                combined_loss=combineLosses(loss_normalization,interacting_hazards[0],interaction,haz_prob[0])
+            else :
+                second=True
+                for single_interaction in interacting_hazards:
+                    index_nm=interacting_hazards.index(single_interaction)
+                    combined_loss_step=combineLosses(loss_normalization,single_interaction,interaction,haz_prob[index_nm])
+                    if second:
+                        combined_loss=combined_loss_step
+                        second=False
+                    else:
+                        cols=combined_loss_step.columns.tolist()
+                        cols_selected=[word for word in cols if ('combined' in word)]
+                        merged=pd.merge(left=combined_loss,right=combined_loss_step,how='outer',left_on=['Unit_ID'], right_on=['Unit_ID'],right_index=False,suffixes=('_left', '_right'))
+                        del combined_loss,combined_loss_step
+                        merged_cols=merged.columns.tolist()
+                        for col in cols_selected:
+                            merged_selected=[word for word in merged_cols if (col in word)]
+                            merged[col]=merged[merged_selected].sum(axis=1)
+                            merged=merged.drop(columns=[merged_selected])
+                        combined_loss=merged
+                    # do same as in above steps
+            if first:
+                final_loss=combined_loss
+                first=False
+            else:
+                cols=combined_loss.columns.values.tolist()
+                cols_selected=[word for word in cols if ('combined' in word)]
+                merged=pd.merge(left=final_loss,right=combined_loss,how='outer',left_on=['Unit_ID'], right_on=['Unit_ID'],right_index=False,suffixes=('_left', '_right'))
+                del final_loss,combined_loss
+                merged_cols=merged.columns.values.tolist()
+                for col in cols_selected:
+                    merged_selected=[word for word in merged_cols if (col in word)]
+                    merged[col]=merged[merged_selected].sum(axis=1)
+                    merged=merged.drop(columns=[merged_selected])
+                final_loss=merged
+        
+        # prepare information for the calculation of risk
+        probabilities=loss_haz[probs]
+        columns=loss_haz[cols]
+        columns=[w.replace(Name_hazard, 'combined') for w in columns]
+        risk=calculateRisk(final_loss,columns,probabilities)
+        if first_risk:
+            totalrisk=risk.rename(columns={"AAL": "AAL_total"})
+            first_risk=False
         else:
-            cols=combined_loss.columns.values.tolist()
-            cols_selected=[word for word in cols if ('combined' in word)]
-            merged=pd.merge(left=final_loss,right=combined_loss,how='outer',left_on=['Unit_ID'], right_on=['Unit_ID'],right_index=False,suffixes=('_left', '_right'))
-            del final_loss,combined_loss
-            merged_cols=merged.columns.values.tolist()
-            for col in cols_selected:
-                merged_selected=[word for word in merged_cols if (col in word)]
-                merged[col]=merged[merged_selected].sum(axis=1)
-                merged=merged.drop(columns=[merged_selected])
-            final_loss=merged
-    
-    # prepare information for the calculation of risk
-    probabilities=loss_haz[probs]
-    columns=loss_haz[cols]
-    columns=[w.replace(Name_hazard, 'combined') for w in columns]
-    risk=calculateRisk(final_loss,columns,probabilities)
+            combined_df=pd.merge(left=totalrisk,right=risk,how='outer',left_on=['Unit_ID'],right_on=['Unit_ID'],right_index=False)
+            combined_df["AAL_sum"]=combined_df["AAL_total"]+combined_df["AAL"]
+            combined_df=combined_df.drop(["AAL_total", "AAL"], axis=1)
+            del totalrisk
+            totalrisk=combined_df.rename(columns={"AAL_sum": "AAL_total"})
+    risk=totalrisk.rename(columns={"AAL_total": "AAL"})
     metatable=readmeta.readLossMeta(connstr,lossids[0])
     schema= metatable.workspace[0]
     risk['risk_id']=riskid
