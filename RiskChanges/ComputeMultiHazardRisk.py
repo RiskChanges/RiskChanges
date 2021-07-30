@@ -70,9 +70,11 @@ def predict_loss(prepared_loss,rps,probs,extensions,hazard):
 def getMaxcost(con,lossid):
     meta=readmeta.readLossMeta(con,lossid)
     ear_id=meta['ear_index_id'][0]
+    earmeta=readmeta.exposuremeta(con,ear_id)
+    earPK=earmeta.data_id[0]
     cost_column=meta['ear_cost_column'][0]
     cost_data=readvector.readear(con,ear_id)
-    return cost_data,cost_column
+    return cost_data,cost_column,earPK
 
 def PrepareLossForRisk(con, lossids,extensions,hazard):
     i=True
@@ -91,8 +93,8 @@ def PrepareLossForRisk(con, lossids,extensions,hazard):
         else:
             prepared_loss=prepared_loss.merge(lossdata, on='Unit_ID')
     modified_loss,cols, probs=predict_loss(prepared_loss,rps,probs,extensions,hazard)
-    cost_data,cost_col=getMaxcost(con,lossids[0])
-    prepared_loss=pd.merge(left=modified_loss, right=cost_data[['id',cost_col]], how='outer', left_on=['Unit_ID'], right_on=['id'],right_index=False).rename(columns={cost_col: 'MAX_COST'})
+    cost_data,cost_col,earPK=getMaxcost(con,lossids[0])
+    prepared_loss=pd.merge(left=modified_loss, right=cost_data[[earPK,cost_col]], how='outer', left_on=['Unit_ID'], right_on=[earPK],right_index=False).rename(columns={cost_col: 'MAX_COST'})
     return modified_loss,cols,probs
 
 def combineLosses(lossess,interacting_hazards,interaction='independent',haz_prob=(1,1)):
@@ -274,8 +276,13 @@ def computeMulRisk(connstr,losscombinations,hazardinteractions,extensions,riskid
         admin_unit=readvector.readAdmin(con,adminid)
         ear_id=metatable['ear_index_id'][0]
         ear= readvector.readear(con,ear_id)
-        risk=pd.merge(left=risk, right=ear['id','geom'], left_on='Unit_ID',right_on='id',right_index=False)
+        earmeta=readmeta.exposuremeta(con,ear_id)
+        earPK=earmeta.data_id[0]
+        adminmeta=readmeta.getAdminMeta(con,adminid)
+        adminpk=adminmeta.data_id[0]
+        risk=pd.merge(left=risk, right=ear[earPK,'geom'], left_on='Unit_ID',right_on=earPK,right_index=False)
         risk= gpd.GeoDataFrame(risk,geometry='geom')
-        risk=aggregator.aggregaterisk(risk,admin_unit)
+        risk=aggregator.aggregaterisk(risk,admin_unit,adminpk)
+        assert not risk.empty , f"The aggregated dataframe in risk returned empty"
         writevector.writeRiskAgg(risk,con,schema)
     #what to do with the over sampling of the computation. other than that already done. 
