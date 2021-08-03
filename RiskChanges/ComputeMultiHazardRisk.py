@@ -7,6 +7,7 @@ import RiskChangesOps.writevector as writevector
 import RiskChangesOps.AggregateData as aggregator
 import geopandas as gpd
 import pandas as pd
+import numpy as np
 def dutch_method(xx,yy):
         #compute risk based on dutch method where xx is value axis and yy is probability axis
         AAL=auc(yy,xx)+(xx[0]*yy[0])
@@ -15,7 +16,7 @@ def dutch_method(xx,yy):
 def checkUniqueHazard(con, lossids):
     blank_list=[]
     for lossid in lossids:
-        haztype=readmeta.getHazardType(connstr,lossid)
+        haztype=readmeta.getHazardType(con,lossid)
         blank_list.append(haztype)
     assert pd.Series(blank_list).nunique()==1, "Only multiple return periods of single hazard is supported"
 
@@ -97,7 +98,7 @@ def PrepareLossForRisk(con, lossids,extensions,hazard):
     prepared_loss=pd.merge(left=modified_loss, right=cost_data[[earPK,cost_col]], how='outer', left_on=['Unit_ID'], right_on=[earPK],right_index=False).rename(columns={cost_col: 'MAX_COST'})
     return modified_loss,cols,probs
 
-def combineLosses(lossess,interacting_hazards,interaction='independent',haz_prob=(1,1)):
+def combineLosses(lossess,interacting_hazards,interaction='independent',haz_prob=None):
     if interaction== 'cascading':
         interaction_function=mul_cascading
     elif interaction== 'compounding':
@@ -110,24 +111,32 @@ def combineLosses(lossess,interacting_hazards,interaction='independent',haz_prob
         interaction_function=mul_independent
     else: 
         raise ValueError("The interaction names do not match the possible hazard interaction. It can be only independent, compounding, cascading, conditional or coupled")
-    haz1=interacting_hazards[0]
-    haz2=interacting_hazards[1]
+
+    hazlist=[]
+    first=True
+    for haz in interacting_hazards:
+        hazlist.append(haz)
+
+        loss=lossess[haz]['normalized_loss']
+        column_multiply=lossess[haz]['cols']
+        haz_index=interacting_hazards.index(haz)
+        if haz_prob !=None:
+            loss[column_multiply]=loss[column_multiply]*haz_prob[haz_index]
+        if first:
+            all_loss=loss
+            first=False
+        else:
+            loss=loss.drop(columns=['MAX_COST'])
+            all_loss=pd.merge(left=all_loss, right=loss, how='outer', left_on=['Unit_ID'], right_on=['Unit_ID'],right_index=False)
     
-    loss1=lossess[haz1]['normalized_loss']
-    loss2=lossess[haz2]['normalized_loss']
     first_data=True
     #max_cost obtain from database
-    cols=[w.replace(haz1, '') for w in lossess[haz1]['cols']]
+    cols=[w.replace(haz, '') for w in lossess[haz]['cols']]
     new_columns=[]
+
     for col in cols:
-        col1=haz1+col
-        col2=haz2+col
-        df1=loss1[['UNIT_ID','MAX_COST',col1]].rename(columns={col1: 'loss1'})
-        df2=loss2[['UNIT_ID',col2]].rename(columns={col2: 'loss2'})
-        df=pd.merge(left=df1, right=df2, how='outer', left_on=['Unit_ID'], right_on=['Unit_ID'],right_index=False) #also merge maximum value
-        df['loss1']=haz_prob[0]*df['loss1']
-        df['loss2']=haz_prob[1]*df['loss2']
-        combined_loss_step=interaction_function(df,haz_prob)
+        colm= [haz1+col for haz1 in hazlist]
+        combined_loss_step=interaction_function(all_loss,colm)
         new_name='combined'+col
         combined_loss_step=combined_loss_step.rename(columns={'combined':new_name})
         new_columns.append(new_name)
@@ -138,36 +147,36 @@ def combineLosses(lossess,interacting_hazards,interaction='independent',haz_prob
             combined_loss=pd.merge(left=combined_loss,right=combined_loss_step,how='outer',left_on=['Unit_ID'], right_on=['Unit_ID'],right_index=False)
     return combined_loss
 
-def mul_independent(loss_data):
-    loss_data['combined']=loss_data[['loss1','loss2']].sum(axis=1)
+def mul_independent(loss_data,colm):
+    loss_data['combined']=loss_data[colm].sum(axis=1)
     independent_loss=loss_data[['Unit_ID','combined']]
     return independent_loss
 
     #return combination of risks
 
-def mul_compounding(loss_data):
-    loss_data['combined_nf']=loss_data[['loss1','loss2']].sum(axis=1)
-    loss_data['combined']=loss_data[['combined_nf','maxvalue']].min(axis=1)
+def mul_compounding(loss_data,colm):
+    loss_data['combined_nf']=loss_data[colm].sum(axis=1)
+    loss_data['combined']=loss_data[['combined_nf','MAX_COST']].min(axis=1)
     compounding_loss=loss_data[['Unit_ID','combined']]
     return compounding_loss
     #return combination of risks
 
-def mul_coupled(loss_data):
-    loss_data['combined']=loss_data[['loss1','loss2']].max(axis=1)
+def mul_coupled(loss_data,colm):
+    loss_data['combined']=loss_data[colm].max(axis=1)
     coupled_loss=loss_data[['Unit_ID','combined']]
     return coupled_loss
 
     #return combination of risks
 
-def mul_cascading(loss_data):
-    loss_data['combined_nf']=loss_data[['loss1','loss2']].sum(axis=1)
-    loss_data['combined']=loss_data[['combined_nf','maxvalue']].min(axis=1)
+def mul_cascading(loss_data,colm):
+    loss_data['combined_nf']=loss_data[colm].sum(axis=1)
+    loss_data['combined']=loss_data[['combined_nf','MAX_COST']].min(axis=1)
     cascading_loss=loss_data[['Unit_ID','combined']]
     return cascading_loss
     #return combination of risks
 
-def mul_conditional(individual_losses,value,triggering,probability_conditional=1):
-    loss_data['combined']=loss_data[['loss1','loss2']].sum(axis=1)
+def mul_conditional(loss_data,colm):
+    loss_data['combined']=loss_data[colm].sum(axis=1)
     conditional_loss=loss_data[['Unit_ID','combined']]
     return conditional_loss
     #return combination of risks
@@ -226,18 +235,26 @@ def computeMulRisk(connstr,groupcombinations,extensions,riskid,**kwargs): #pass 
                 except:
                     raise ValueError('the hazard weights for cascading and conditional interaction in all the hazards are not provided use 1 if it is not available')
             else:
-                haz_prob = [(1,1)]
-                haz_prob = haz_prob*len(interacting_hazards)
+                haz_prob = None
+                #haz_prob = haz_prob*len(interacting_hazards)
 
             if len(interacting_hazards)==0:
                 continue
             elif len(interacting_hazards)==1:
-                combined_loss=combineLosses(loss_normalization,interacting_hazards[0],interaction,haz_prob[0])
+                if haz_prob !=None:
+                    haz_prob_arg=haz_prob[0]
+                else:
+                    haz_prob_arg=None
+                combined_loss=combineLosses(loss_normalization,interacting_hazards[0],interaction,haz_prob_arg)
             else :
                 second=True
                 for single_interaction in interacting_hazards:
                     index_nm=interacting_hazards.index(single_interaction)
-                    combined_loss_step=combineLosses(loss_normalization,single_interaction,interaction,haz_prob[index_nm])
+                    if haz_prob !=None:
+                        haz_prob_arg=haz_prob[index_nm]
+                    else:
+                        haz_prob_arg=None
+                    combined_loss_step=combineLosses(loss_normalization,single_interaction,interaction,haz_prob_arg)
                     if second:
                         combined_loss=combined_loss_step
                         second=False
@@ -288,18 +305,17 @@ def computeMulRisk(connstr,groupcombinations,extensions,riskid,**kwargs): #pass 
     risk['risk_id']=riskid
     
     if not onlyaggregated:
-        writevector.writeRisk(risk,con,schema)
+        writevector.writeRisk(risk,connstr,schema)
     if is_aggregated:
-        admin_unit=readvector.readAdmin(con,adminid)
+        admin_unit=readvector.readAdmin(connstr,adminid)
         ear_id=metatable['ear_index_id'][0]
-        ear= readvector.readear(con,ear_id)
-        earmeta=readmeta.exposuremeta(con,ear_id)
+        ear= readvector.readear(connstr,ear_id)
+        earmeta=readmeta.exposuremeta(connstr,ear_id)
         earPK=earmeta.data_id[0]
-        adminmeta=readmeta.getAdminMeta(con,adminid)
+        adminmeta=readmeta.getAdminMeta(connstr,adminid)
         adminpk=adminmeta.data_id[0]
         risk=pd.merge(left=risk, right=ear[earPK,'geom'], left_on='Unit_ID',right_on=earPK,right_index=False)
         risk= gpd.GeoDataFrame(risk,geometry='geom')
         risk=aggregator.aggregaterisk(risk,admin_unit,adminpk)
         assert not risk.empty , f"The aggregated dataframe in risk returned empty"
-        writevector.writeRiskAgg(risk,con,schema)
-    #what to do with the over sampling of the computation. other than that already done. 
+        writevector.writeRiskAgg(risk,connstr,schema)
