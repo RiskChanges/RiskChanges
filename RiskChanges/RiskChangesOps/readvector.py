@@ -86,12 +86,14 @@ def readRiskGeometry(connstr,riskid):
     earid=meta.earid[0]
     schema=meta.workspace[0]
     risktable=meta.risk_table[0]
+    earmeta=readmeta.exposuremeta(connstr,earid)
+    earPK=earmeta.data_id[0]
     sql=f'SELECT * FROM {schema}."{risktable}" as risktable WHERE risktable.loss_id={riskid};'
     #print(sql)
     risk_table=pd.read_sql(sql,con=engine)
     ear=readear(connstr,earid)
     engine.close()
-    risk_table=pd.merge(left=risk_table, right=ear[['id','geom']], how='left', left_on=['Unit_ID'], right_on=['id'],right_index=False)
+    risk_table=pd.merge(left=risk_table, right=ear[[earPK,'geom']], how='left', left_on=['Unit_ID'], right_on=[earPK],right_index=False)
     risk_table=gpd.GeoDataFrame(risk_table,crs=ear.crs,geometry='geom')
     return risk_table
 
@@ -99,12 +101,13 @@ def readAdmin(connstr,adminunit):
     meta=readmeta.getAdminMeta(connstr,adminunit)
     schema=meta.workspace[0]
     engine=psycopg2.connect(connstr)
-    admintablename=meta.layer_name[0]    
+    admintablename=meta.layer_name[0]
+    adminpk=meta.data_id[0]    
     sql=f'SELECT * FROM {schema}."{admintablename}";'
     #print(sql)
     ear_table=gpd.read_postgis(sql,con=engine)
     engine.close()
-    ear_table=ear_table.rename(columns={'id':'ADMIN_ID'})
+    #ear_table=ear_table.rename(columns={adminpk:'ADMIN_ID'})
     return ear_table
     
 

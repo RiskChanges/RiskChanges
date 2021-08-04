@@ -150,11 +150,14 @@ def ComputeExposure(con,earid,hazid,expid,**kwargs):
     if not onlyaggregated:
         writevector.writeexposure(df,con,schema)
     if is_aggregated:
-        admin_unit=readAdmin(con,adminid)        
-        df=pd.merge(left=df, right=ear[['id','geom']], left_on='geom_id',right_on='id',right_index=False)
-
+        admin_unit=readAdmin(con,adminid)
+        adminmeta=readmeta.getAdminMeta(con,adminid)
+        adminpk=adminmeta.data_id[0]       
+        df=pd.merge(left=df, right=ear[[Ear_Table_PK,'geom']], left_on='geom_id',right_on=Ear_Table_PK,right_index=False)
+        assert not df.empty , f"The aggregated dataframe in exposure returned empty"
         df= gpd.GeoDataFrame(df,geometry='geom')
-        df=aggregator.aggregateexpoure(df,admin_unit)
+        df=aggregator.aggregateexpoure(df,admin_unit,adminpk)
+        assert not df.empty , f"The aggregated dataframe in exposure returned empty"
         writevector.writeexposureAgg(df,con,schema)
 
 

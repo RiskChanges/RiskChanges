@@ -87,10 +87,14 @@ def ComputeLoss(con,exposureid,lossid,computeonvalue=True,**kwargs):
     if is_aggregated:
         admin_unit=readvector.readAdmin(con,adminid)
         earid=metadata["earID"]
+        earpk=metadata['earPK']
+        adminmeta=readmeta.getAdminMeta(con,adminid)
+        adminpk=adminmeta.data_id[0]
         ear= readvector.readear(con,earid)
-        loss=pd.merge(left=loss, right=ear['id','geom'], left_on='geom_id',right_on='id',right_index=False)
+        loss=pd.merge(left=loss, right=ear[earpk,'geom'], left_on='geom_id',right_on=earpk,right_index=False)
         loss= gpd.GeoDataFrame(loss,geometry='geom')
-        loss=aggregator.aggregateloss(loss,admin_unit)
+        loss=aggregator.aggregateloss(loss,admin_unit,adminpk)
+        assert not loss.empty , f"The aggregated dataframe in loss returned empty"
         writevector.writeLossAgg(loss,con,schema)
 
 

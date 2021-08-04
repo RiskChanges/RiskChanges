@@ -70,10 +70,15 @@ def ComputeRisk(con,lossids,riskid,**kwargs):
     if is_aggregated:
         admin_unit=readvector.readAdmin(con,adminid)
         ear_id=metatable['ear_index_id'][0]
+        earmeta=readmeta.exposuremeta(con,ear_id)
+        earPK=earmeta.data_id[0]
         ear= readvector.readear(con,ear_id)
-        risk=pd.merge(left=risk, right=ear['id','geom'], left_on='Unit_ID',right_on='id',right_index=False)
+        adminmeta=readmeta.getAdminMeta(con,adminid)
+        adminpk=adminmeta.data_id[0]
+        risk=pd.merge(left=risk, right=ear[earPK,'geom'], left_on='Unit_ID',right_on=earPK,right_index=False)
         risk= gpd.GeoDataFrame(risk,geometry='geom')
-        risk=aggregator.aggregaterisk(risk,admin_unit)
+        risk=aggregator.aggregaterisk(risk,admin_unit,adminpk)
+        assert not risk.empty , f"The aggregated dataframe in risk returned empty"
         writevector.writeRiskAgg(risk,con,schema)
 
  
