@@ -1,32 +1,22 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
-# load shapefile in the SDSS system
-
-
-# In[4]:
-
-
 import geopandas
 from geoalchemy2 import Geometry, WKTElement
 from sqlalchemy import *
 
 
-# In[69]:
-
-
 def loadshp(shpInput, connstr, lyrName, schema, index):
+    print('loadshp called')
     # Load data in geodataframe
     geodataframe = geopandas.read_file(shpInput)
 
     # Identify CRS
     # return  geodataframe
     crs_name = str(geodataframe.crs.srs)
-    print(crs_name)
-    epsg = int(crs_name.replace('epsg:', ''))
+    try:
+        epsg = int(crs_name.replace('epsg:', ''))
+
+    except:
+        epsg = None
+
     if epsg is None:
         epsg = 4326
 
@@ -48,10 +38,3 @@ def loadshp(shpInput, connstr, lyrName, schema, index):
     geodataframe.to_sql(lyrName, engine, schema, if_exists='replace', index=False,
                         dtype={'geom': Geometry('Geometry', srid=epsg)})
     engine.dispose()
-
-
-# In[70]:
-
-
-# loadshp(shpInput="D:\SDSS\Sample data\Split_one\Flood_Class.shp",
-#        connstr='postgresql://postgres:puntu@localhost:5432/postgres',lyrName='Tekson',schema='tekson')
