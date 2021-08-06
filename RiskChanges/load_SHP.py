@@ -4,20 +4,13 @@ from sqlalchemy import *
 
 
 def loadshp(shpInput, connstr, lyrName, schema, index):
-    print('loadshp called')
-    # Load data in geodataframe
     geodataframe = geopandas.read_file(shpInput)
-
-    # Identify CRS
-    # return  geodataframe
-    crs_name = str(geodataframe.crs.srs)
+    crs = geodataframe.crs
     try:
-        epsg = int(crs_name.replace('epsg:', ''))
+        epsg = crs.to_epsg()
 
     except:
-        epsg = None
-
-    if epsg is None:
+        print('Warning! Coordinate system manually assigned to 4326. This might affect on visualization of data.')
         epsg = 4326
 
     # Creating SQLAlchemy's engine to use
@@ -25,16 +18,19 @@ def loadshp(shpInput, connstr, lyrName, schema, index):
 
     geodataframe[index] = geodataframe.index
 
-    # ... [do something with the geodataframe]
-
     geodataframe['geom'] = geodataframe['geometry'].apply(
         lambda x: WKTElement(x.wkt, srid=epsg))
 
     # drop the geometry column as it is now duplicative
     geodataframe.drop('geometry', 1, inplace=True)
 
-    # Use 'dtype' to specify column's type
-    # For the geom column, we will use GeoAlchemy's type 'Geometry'
     geodataframe.to_sql(lyrName, engine, schema, if_exists='replace', index=False,
                         dtype={'geom': Geometry('Geometry', srid=epsg)})
     engine.dispose()
+
+
+#     crs_name = str(geodataframe.crs.srs)
+#     print(geodataframe.crs, 'crs')
+#     print(geodataframe.crs.to_epsg(), type(geodataframe.crs.to_epsg()), 'epsg')
+#     print(geodataframe.crs.srs, 'srs called')
+#     print(type(geodataframe.crs))
