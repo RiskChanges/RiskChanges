@@ -17,9 +17,12 @@ def LoadWFS(wfsURL, layer_name, connstr, layer_name_db, index, schema):
     # Read data from URL
     geodataframe = gpd.read_file(data_url)
 
-    crs_name = str(geodataframe.crs.srs)
-    epsg = int(crs_name.replace('epsg:', ''))
-    if epsg is None:
+    crs = geodataframe.crs
+    try:
+        epsg = crs.to_epsg()
+
+    except:
+        print('Warning! Coordinate system manually assigned to 4326. This might affect on visualization of data.')
         epsg = 4326
 
     geodataframe[index] = geodataframe.index
