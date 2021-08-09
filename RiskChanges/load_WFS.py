@@ -2,6 +2,7 @@ import geopandas as gpd
 import requests
 from geoalchemy2 import Geometry, WKTElement
 from sqlalchemy import *
+from owslib.wfs import WebFeatureService
 
 
 def LoadWFS(wfsURL, layer_name, connstr, layer_name_db, index, schema):
@@ -39,3 +40,14 @@ def LoadWFS(wfsURL, layer_name, connstr, layer_name_db, index, schema):
 
 # LoadWFS(r'http://tajirisk.ait.ac.th:8080/geoserver/ows',
 #         'tajikistan:region', 'postgresql://postgres:gicait123@203.159.29.45:5432/sdssv2', 'kamal', 'geoinformatics_center')
+
+
+def test_WFS(wfs_url, layer_name):
+    wfs11 = WebFeatureService(url=wfs_url, version='1.1.0')
+    wfs_layers = list(wfs11.contents)
+
+    if layer_name in wfs_layers:
+        return layer_name
+
+    else:
+        return "Layer not available. Available layers are: " + wfs_layers
