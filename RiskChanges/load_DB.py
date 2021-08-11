@@ -7,8 +7,6 @@ def load_db(query, source_connection, destination_connection, destination_table,
 
     df = gpd.read_postgis(query, source_connection)
 
-    print(df.head())
-
     crs = df.crs
     try:
         epsg = crs.to_epsg()
@@ -17,7 +15,11 @@ def load_db(query, source_connection, destination_connection, destination_table,
         print('Warning! Coordinate system manually assigned to 4326. This might affect on visualization of data.')
         epsg = 4326
 
+    df['geom'] = df['geom'].apply(
+        lambda x: WKTElement(x.wkt, srid=epsg))
+
     df[index] = df.index
+    print(df.head())
 
     engine = create_engine(destination_connection)
 
