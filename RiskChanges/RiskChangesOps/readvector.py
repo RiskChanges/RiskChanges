@@ -85,7 +85,7 @@ def readLossGeom(connstr, lossid):
     return lossdata_geom
 
 
-def readRiskGeometry(connstr, riskid):
+def readRiskGeom(connstr, riskid):
     engine = psycopg2.connect(connstr)
     meta = readmeta.getRiskMeta(connstr, riskid)
     earid = meta.earid[0]
