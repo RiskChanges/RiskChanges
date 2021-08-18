@@ -56,13 +56,10 @@ def calculateRisk(lossdf, columns, probs):
 
 
 def ComputeRisk(con, lossids, riskid, **kwargs):
-    try:
-        is_aggregated = kwargs['is_aggregated']
-        onlyaggregated = kwargs['only_aggregated']
-        adminid = kwargs['adminunit_id']
-    except:
-        is_aggregated = False
-        onlyaggregated = False
+    is_aggregated = kwargs.get('is_aggregated', False)
+    onlyaggregated = kwargs.get('only_aggregated', False)
+    adminid = kwargs.get('adminunit_id', None)
+
     checkUniqueHazard(con, lossids)
     lossdf, columns, probs = PrepareLossForRisk(con, lossids)
     risk = calculateRisk(lossdf, columns, probs)
