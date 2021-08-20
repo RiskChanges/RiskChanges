@@ -82,4 +82,5 @@ def ComputeRisk(con, lossids, riskid, **kwargs):
         risk = gpd.GeoDataFrame(risk, geometry='geom')
         risk = aggregator.aggregaterisk(risk, admin_unit, adminpk)
         assert not risk.empty, f"The aggregated dataframe in risk returned empty"
+        risk['risk_id']=riskid
         writevector.writeRiskAgg(risk, con, schema)

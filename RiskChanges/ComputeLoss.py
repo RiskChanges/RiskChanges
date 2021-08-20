@@ -109,4 +109,5 @@ def ComputeLoss(con, exposureid, lossid, computeonvalue=True, **kwargs):
         loss = gpd.GeoDataFrame(loss, geometry='geom')
         loss = aggregator.aggregateloss(loss, admin_unit, adminpk)
         assert not loss.empty, f"The aggregated dataframe in loss returned empty"
+        loss['loss_id'] = lossid
         writevector.writeLossAgg(loss, con, schema)
