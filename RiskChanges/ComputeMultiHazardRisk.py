@@ -201,11 +201,23 @@ def calculateRisk(lossdf,columns, probs):
     return risktable
 
 
-def computeMulRisk(connstr,groupcombinations,extensions,riskid,**kwargs): #pass dictionaries of loss and hazard combinations. losscombiations can be like this {'flood':[5,6,1],'earthquake':[8,4,9]} interactions can be {'independent':[('eartqhuake','flood'),('earthquake','debrisflow')],'cascading':[('landslide','flood')],'cascading_weights':[(1,0.5)]}. extensions provide information on how to extend the datasets it should be like this {'earthquake':{'left':[(x1,y1),(x2,y2)], 'right':[(a1,b1),(a2,b2)]}, 'flood':{'left':[(x1,y1),(x2,y2)], 'right':[(a1,b1),(a2,b2)]}}
-    #UPDATE: group combinations are just combinationsof group like this
-    #{'group1':[{'flood':[5,6,1],'earthquake':[8,4,9]},{'independent':[('eartqhuake','flood'),('earthquake','debrisflow')],'cascading':[('landslide','flood')],'cascading_weights':[(1,0.5)]}]}
-    #Where group is a specific group of hazards which do not repeat and can be added in later stage. 
-    #the first element in list represents the combinations of lossids and seond one represents the hazard interactions ALWAYS IN THAT WAY
+#format for group combinations..
+#const groupComb = [
+#  {
+#    group: "group 1",
+#    hazards: ["flash flood", "landslide", "mudflow"],
+#    weights: [0.5, 0.7, 0.2],
+#     interactions:['cascading'],
+#    lossid: [[12, 23, 213], [123, 213, 21], [12]],
+#  }, {
+#    group: "group 2",
+#    hazards: ["eq", "jsddkfd"],
+#    weights: [0.2, 0.9],
+#    lossid: [[12, 23], [123]],
+#  },
+#];***
+
+def computeMulRisk(connstr,groupcombinations,extensions,riskid,**kwargs): 
     try:
         is_aggregated=kwargs['is_aggregated']
         onlyaggregated=kwargs['only_aggregated']
@@ -214,38 +226,44 @@ def computeMulRisk(connstr,groupcombinations,extensions,riskid,**kwargs): #pass 
         is_aggregated= False
         onlyaggregated= False
     first_risk=True
+
     for group in groupcombinations:
-        losscombinations=groupcombinations[group][0]
-        hazardinteractions=groupcombinations[group][1]
+        losscombinations=groupcombinations[group]['lossid']
+        hazardinteractions=groupcombinations[group]['interactions']
+        hazards=groupcombinations[group]['hazards']
+        weights=groupcombinations[group]['weights']
         loss_normalization={}
         first=True
         
-        for hazard in losscombinations:
+        for hazard in hazards:
             Name_hazard=hazard
-            lossids=losscombinations[hazard]
-            extention=extensions[hazard]
+            hazard_index=hazards.index(hazard)
+            lossids=losscombinations[hazard_index]
+            extention=extensions[hazard_index]
             normalized_loss,cols,probs=PrepareLossForRisk(connstr, lossids,extention,hazard)
             loss_haz={'normalized_loss':normalized_loss,'cols':cols,'probs':probs}
             loss_normalization[hazard]=loss_haz
         for interaction in hazardinteractions:
-            interacting_hazards=hazardinteractions[interaction]
+            interacting_hazards=hazards#hazardinteractions[interaction]
             if (interaction=='cascading') | (interaction=='conditional'):
                 try:
-                    haz_prob=hazardinteractions[interaction+'_weights']
+                    if ((result == null) or (result.isEmpty())):
+                        raise ValueError('the hazard weights for cascading and conditional interaction in all the hazards are not provided use 1 if it is not available')
+                    haz_prob=weights#hazardinteractions[interaction+'_weights']
                 except:
                     raise ValueError('the hazard weights for cascading and conditional interaction in all the hazards are not provided use 1 if it is not available')
             else:
                 haz_prob = None
                 #haz_prob = haz_prob*len(interacting_hazards)
 
-            if len(interacting_hazards)==0:
+            if len(hazardinteractions)==0:
                 continue
-            elif len(interacting_hazards)==1:
+            elif len(hazardinteractions)==1:
                 if haz_prob !=None:
                     haz_prob_arg=haz_prob[0]
                 else:
                     haz_prob_arg=None
-                combined_loss=combineLosses(loss_normalization,interacting_hazards[0],interaction,haz_prob_arg)
+                combined_loss=combineLosses(loss_normalization,interacting_hazards,interaction,haz_prob_arg)
             else :
                 second=True
                 for single_interaction in interacting_hazards:
