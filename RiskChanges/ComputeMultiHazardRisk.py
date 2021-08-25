@@ -1,11 +1,8 @@
-import RiskChangesOps.readmeta as readmeta
-import RiskChangesOps.readvector as readvector
 from sklearn.metrics import auc
-import RiskChangesOps.writevector as writevector
-import RiskChangesOps.AggregateData as aggregator
 import geopandas as gpd
 import pandas as pd
 import numpy as np
+from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
 
 def dutch_method(xx, yy):
