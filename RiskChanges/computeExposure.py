@@ -107,19 +107,14 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
 
 
 def pointExposure(ear, haz, expid, Ear_Table_PK):
-    df = pd.DataFrame()
-    df_temp = pd.DataFrame()
-    for ind, row in ear.iterrows():
-        coords =(row.geom.x, row.geom.y) #[(x, y) for x, y in zip(row.geom.x, row.geom.y)]
-        a = haz.sample(coords)
-        df_temp['class'] = a
-        df_temp['exposed'] = 100
-        df_temp['geom_id'] = row[Ear_Table_PK]
-        df_temp['areaOrLen'] = 0
-        df_temp['exposure_id'] = expid
-        df = df.append(df_temp, ignore_index=True)
+    coords = [(x,y) for x, y in zip(ear.geometry.x, ear.geometry.y)]
+    ear['class'] = [x for x in haz.sample(coords)]
+    ear['exposure_id'] = expid
+    ear['areaOrLen'] = 0
+    ear['exposed'] = 100
+    ear=ear.rename(columns={Ear_Table_PK:'geom_id' })
     haz = None
-    return df
+    return ear
 
 
 def ComputeExposure(con, earid, hazid, expid, **kwargs):
