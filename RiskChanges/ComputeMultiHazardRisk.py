@@ -266,7 +266,7 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
             interacting_hazards = hazards  # hazardinteractions[interaction]
             if (interaction == 'cascading') | (interaction == 'conditional'):
                 try:
-                    if ((result == null) or (result.isEmpty())):
+                    if ((len(weights)== 0) or (weights==None)):
                         raise ValueError(
                             'the hazard weights for cascading and conditional interaction in all the hazards are not provided use 1 if it is not available')
                     # hazardinteractions[interaction+'_weights']
