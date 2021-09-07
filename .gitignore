@@ -3,3 +3,5 @@ __pycache__
 dist/*
 build/*
 *.egg-info
+Test_Files.ipynb
+.ipynb_checkpoints
