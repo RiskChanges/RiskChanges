@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import numpy.ma as ma
 import geopandas as gpd
-
+import warnings
 from .RiskChangesOps import rasterops, vectorops, writevector, AggregateData as aggregator
 from .RiskChangesOps.readraster import readhaz
 from .RiskChangesOps.readvector import readear, readAdmin
@@ -128,7 +128,10 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     #assert vectorops.cehckprojection(
     #    ear, haz), "The hazard and EAR do not have same projection system please check it first"
     if vectorops.cehckprojection(ear, haz):
+        
+        warnings.warn("The input co-ordinate system for hazard and EAR were differe, we have updated it for now on the fly but from next time please check your data before computation")
         ear=vectorops.changeprojection(ear,haz)
+
     metatable = readmeta.earmeta(con, earid)
     Ear_Table_PK = metatable.data_id[0]
     schema = metatable.workspace[0]
