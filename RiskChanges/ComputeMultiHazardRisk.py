@@ -21,18 +21,18 @@ def checkUniqueHazard(con, lossids):
 
 
 def predict_loss(prepared_loss, rps, probs, extensions, hazard):
-    Lmin_x = extensions['left'][0][0]
-    Lmin_y = extensions['left'][0][1]
-    Rmin_x = extensions['right'][0][0]
-    Rmin_y = extensions['right'][0][1]
-    Lmax_x = extensions['left'][1][0]
-    Lmax_y = extensions['left'][1][1]
-    Rmax_x = extensions['right'][1][0]
-    Rmax_y = extensions['right'][1][1]
-    m_left = abs(Lmin_y-Lmax_y)/abs(Lmin_x-Lmax_x)
-    m_right = abs(Rmin_y-Rmax_y)/abs(Rmin_x-Rmax_x)
-    min_rp = int(1/Lmin_x)
-    max_rp = int(1/Rmax_x)
+    #Lmin_x = extensions['left'][0][0]
+    #Lmin_y = extensions['left'][0][1]
+    #Rmin_x = extensions['right'][0][0]
+    #Rmin_y = extensions['right'][0][1]
+    #Lmax_x = extensions['left'][1][0]
+    #Lmax_y = extensions['left'][1][1]
+    #Rmax_x = extensions['right'][1][0]
+    #Rmax_y = extensions['right'][1][1]
+    m_left =extensions['left_slope'] #abs(Lmin_y-Lmax_y)/abs(Lmin_x-Lmax_x)
+    m_right =extensions['right_slope'] #abs(Rmin_y-Rmax_y)/abs(Rmin_x-Rmax_x)
+    min_rp = extensions['min_rp']#int(1/Lmin_x)
+    max_rp = extensions['max_rp']#int(1/Rmax_x)
     return_periods = np.linspace(min_rp, max_rp, 6).astype(int)
     return_periods = np.around(return_periods, decimals=-1).tolist()
     return_periods[0] = min_rp
@@ -237,6 +237,11 @@ def calculateRisk(lossdf, columns, probs):
 #    lossid: [[12, 23], [123]],
 #  },
 # ];***
+#{ left_slope:0.4,right_slope:0.6}
+#
+#
+#
+#
 
 def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
     is_aggregated = kwargs.get('is_aggregated', False)
@@ -256,7 +261,7 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
             Name_hazard = hazard
             hazard_index = hazards.index(hazard)
             lossids = losscombinations[hazard_index]
-            extention = extensions[hazard_index]
+            extention = extensions#[hazard_index]
             normalized_loss, cols, probs = PrepareLossForRisk(
                 connstr, lossids, extention, hazard)
             loss_haz = {'normalized_loss': normalized_loss,
