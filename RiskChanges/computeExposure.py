@@ -125,8 +125,10 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
 
     ear = readear(con, earid)
     haz = readhaz(con, hazid, haz_file)
+    ear_epsg = ear.crs.to_epsg()
+    haz_epsg = haz.crs.to_epsg()
     assert vectorops.cehckprojection(
-        ear, haz), "The hazard and EAR do not have same projection system please check it first"
+       ear, haz), "The hazard and EAR do not have same projection system please check it first. ear_epsg: {}, hazard_epsg: {}".format(ear_epsg, haz_epsg)
     metatable = readmeta.earmeta(con, earid)
     Ear_Table_PK = metatable.data_id[0]
     schema = metatable.workspace[0]
