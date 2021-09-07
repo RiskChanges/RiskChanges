@@ -10,4 +10,9 @@ def cehckprojection(ear,haz):
         return True
     else:
         return False
+def changeprojection(ear,haz):
+    #ear_epsg=ear.crs.to_epsg()
+    haz_epsg=haz.crs.to_epsg()
+    ear=ear.to_crs(epsg=haz_epsg)
+    return ear
 
