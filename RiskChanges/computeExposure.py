@@ -149,7 +149,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     elif(geometrytype == 'Point' or geometrytype == 'MultiPoint'):
         df = pointExposure(ear, haz, expid, Ear_Table_PK)
 
-    elif(geometrytype == 'LineString' or geometrytype == 'MultiLinestring'):
+    elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
         df = lineExposure(ear, haz, expid, Ear_Table_PK)
     haz = None
     if not onlyaggregated:
