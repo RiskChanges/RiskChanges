@@ -17,6 +17,8 @@ def loadshp(shpInput, connstr, lyrName, schema, index):
     engine = create_engine(connstr)
 
     geodataframe[index] = geodataframe.index
+    if 'geometry' not in geodataframe.columns:
+        raise ValueError("The input shapefile do not consist of 'geometry' column, please make sure it has geometry column (it can be with different name such as geom, in such case please rename it.)")
 
     geodataframe['geom'] = geodataframe['geometry'].apply(
         lambda x: WKTElement(x.wkt, srid=epsg))
