@@ -14,7 +14,10 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
     for ind, row in ear.iterrows():
         # print(row)
         # rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
-        maska, transform = rasterops.cropraster(haz, [row.geom])
+        try:
+            maska, transform = rasterops.cropraster(haz, [row.geom])
+        except:
+            continue
         zoneraster = ma.masked_array(maska, mask=maska == 0)
         len_ras = zoneraster.count()
         # print(len_ras)
@@ -65,7 +68,10 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
     for ind, row in ear.iterrows():
         polygon = row.geom.buffer(buffersize)
         # rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
-        maska, transform = rasterops.cropraster(haz, [polygon])
+        try:
+            maska, transform = rasterops.cropraster(haz, [polygon])
+        except:
+            continue
         zoneraster = ma.masked_array(maska, mask=maska == 0)
         len_ras = zoneraster.count()
         # print(len_ras)
