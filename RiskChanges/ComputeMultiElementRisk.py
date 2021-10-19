@@ -1,9 +1,7 @@
-import RiskChangesOps.readmeta as readmeta
-import RiskChangesOps.readvector as readvector
-import RiskChangesOps.AggregateData as aggregator
-import RiskChangesOps.writevector as writevector
 import pandas as pd
 import geopandas as gpd
+from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
+
 def combineRisks(connstr,riskids,adminunitid,combinedriskid):
     admin_unit=readvector.readAdmin(connstr,adminunitid)
     first=True
