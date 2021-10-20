@@ -18,6 +18,6 @@ def loadvuln(csv_dir, vulnID, connstr, vuln_point_table="vulnIndex"):
     df['vulnID_fk_id'] = vulnID
     # Inserting each row
     engine = create_engine(connstr)
-    df.to_sql(vuln_point_table, engine, if_exists='replace', index=False)
+    df.to_sql(vuln_point_table, engine, if_exists='append', index=False)
     engine.dispose()
     return('sucessfully loaded')
