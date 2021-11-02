@@ -54,10 +54,11 @@ def computeloss_meta(connstr,exposureid):
     exposureTable=meta.exposure_table[0]
     earID=meta.ear_index_id[0]
     hazid=meta.hazard_index_id[0]
-    earPK=meta.ear_index_primary_key[0]
+    # earPK=meta.ear_index_primary_key[0]
     #get it from EAR
     metaear=earmeta(connstr,earID)
     Schema=metaear.workspace[0]
+    earPK=metaear.data_id[0]
     # #ask tek?
     costColumn=metaear.col_value_avg[0]
     populColumn=metaear.col_population_avg[0]
