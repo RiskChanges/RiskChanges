@@ -6,103 +6,64 @@ from sqlalchemy import create_engine
 
 def writeexposure(df, connstr, schema):
     engine = create_engine(connstr)
-    try:
-        df.to_sql('exposure_result', engine, schema,
-                  if_exists='append', index=False)
-        print('data written')
+    df.to_sql('exposure_result', engine, schema,
+              if_exists='append', index=False)
+    print('data written')
 
-    except:
-        # auto add its primary key
-        raise Exception(
-            "error, trying to append in non related table,please store in same table as Exposure")
     engine.dispose()
 
 
 def writeexposureAgg(df, connstr, schema):
     engine = create_engine(connstr)
     print(engine)
-    try:
-        df.to_sql('exposure_result_agg', engine, schema,
-                  if_exists='append', index=False)
-        print('data written')
+    df.to_sql('exposure_result_agg', engine, schema,
+              if_exists='append', index=False)
+    print('data written')
 
-    except:
-        # auto add its primary key
-        raise Exception(
-            "error, trying to append in non related table,please store in same table as Exposure")
     engine.dispose()
 
 
 def writeLossAgg(df, connstr, schema):
     engine = create_engine(connstr)
     # print(engine)
-    try:
-        df.to_sql('loss_result_agg', engine, schema,
-                  if_exists='append', index=False)
-        print('data written')
+    df.to_sql('loss_result_agg', engine, schema,
+              if_exists='append', index=False)
+    print('data written')
 
-    except:
-        # auto add its primary key
-        raise Exception(
-            "error, trying to append in non related table,please store in same table as Loss")
     engine.dispose()
 
 
 def writeLoss(df, connstr, schema):
     engine = create_engine(connstr)
-    # print(engine)
-    try:
-        df.to_sql('loss_result', engine, schema,
-                  if_exists='append', index=False)
-        print('data written')
 
-    except:
-        # auto add its primary key
-        raise Exception(
-            "error, trying to append in non related table,please store in same table as Loss")
+    df.to_sql('loss_result', engine, schema,
+              if_exists='append', index=False)
+    print('data written')
+
     engine.dispose()
 
 
 def writeRisk(df, connstr, schema):
     engine = create_engine(connstr)
-    # print(engine)
-    try:
-        df.to_sql('risk_result', engine, schema,
-                  if_exists='append', index=False)
-        print('data written')
-
-    except:
-        # auto add its primary key
-        raise Exception(
-            "error, trying to append in non related table,please store in same table as Risk")
+    df.to_sql('risk_result', engine, schema,
+              if_exists='append', index=False)
+    print('data written')
     engine.dispose()
 
 
 def writeRiskAgg(df, connstr, schema):
     engine = create_engine(connstr)
-    # print(engine)
-    try:
-        df.to_sql('risk_result_agg', engine, schema,
-                  if_exists='append', index=False)
-        print('data written')
+    df.to_sql('risk_result_agg', engine, schema,
+              if_exists='append', index=False)
+    print('data written')
 
-    except:
-        # auto add its primary key
-        raise Exception(
-            "error, trying to append in non related table,please store in same table as Risk")
     engine.dispose()
 
 
 def writeRiskCombined(df, connstr, schema):
     engine = create_engine(connstr)
-    # print(engine)
-    try:
-        df.to_sql('risk_result_combined', engine, schema,
-                  if_exists='append', index=False)
-        print('data written')
+    df.to_sql('risk_result_combined', engine, schema,
+              if_exists='append', index=False)
+    print('data written')
 
-    except:
-        # auto add its primary key
-        raise Exception(
-            "error, trying to append in non related table,please store in same table as Risk")
     engine.dispose()
