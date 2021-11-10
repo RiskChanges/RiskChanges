@@ -113,14 +113,27 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
 
 
 def pointExposure(ear, haz, expid, Ear_Table_PK):
-    coords = [(x,y) for x, y in zip(ear.geometry.x, ear.geometry.y)]
-    ear['class'] = [x for x in haz.sample(coords)]
-    ear['exposure_id'] = expid
-    ear['areaOrLen'] = 0
-    ear['exposed'] = 100
-    ear=ear.rename(columns={Ear_Table_PK:'geom_id' })
+    coords = [(x, y) for x, y in zip(ear.geometry.x, ear.geometry.y)]
+    df_temp = pd.DataFrame()
+    classes = []
+    for x in haz.sample(coords):
+        classes.append(x[0])
+    df_temp['class'] = classes
+    df_temp['exposure_id'] = expid
+    df_temp['areaOrLen'] = 0
+    df_temp['exposed'] = 100
+    df_temp['geom_id'] = ear[Ear_Table_PK]
     haz = None
-    return ear
+    return df_temp
+
+    # coords = [(x,y) for x, y in zip(ear.geometry.x, ear.geometry.y)]
+    # ear['class'] = [x for x in haz.sample(coords)]
+    # ear['exposure_id'] = expid
+    # ear['areaOrLen'] = 0
+    # ear['exposed'] = 100
+    # ear=ear.rename(columns={Ear_Table_PK:'geom_id' })
+    # haz = None
+    # return ear
 
 
 def ComputeExposure(con, earid, hazid, expid, **kwargs):
@@ -131,12 +144,12 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
 
     ear = readear(con, earid)
     haz = readhaz(con, hazid, haz_file)
-    #assert vectorops.cehckprojection(
+    # assert vectorops.cehckprojection(
     #    ear, haz), "The hazard and EAR do not have same projection system please check it first"
     if vectorops.cehckprojection(ear, haz):
-        
+
         warnings.warn("The input co-ordinate system for hazard and EAR were differe, we have updated it for now on the fly but from next time please check your data before computation")
-        ear=vectorops.changeprojection(ear,haz)
+        ear = vectorops.changeprojection(ear, haz)
 
     metatable = readmeta.earmeta(con, earid)
     Ear_Table_PK = metatable.data_id[0]
