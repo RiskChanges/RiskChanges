@@ -159,7 +159,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     if (geometrytype == 'Polygon' or geometrytype == 'MultiPolygon'):
         ear['areacheck'] = ear.geom.area
         mean_area = ear.areacheck.mean()
-        if mean_area <= 100:
+        if mean_area <= 0:
             ear['geom'] = ear['geom'].centroid
             df = pointExposure(ear, haz, expid, Ear_Table_PK)
         else:
