@@ -120,7 +120,7 @@ def pointExposure(ear, haz, expid, Ear_Table_PK):
         classes.append(x[0])
     df_temp['class'] = classes
     df_temp['exposure_id'] = expid
-    df_temp['areaOrLen'] = 0
+    df_temp['areaOrLen'] = 1
     df_temp['exposed'] = 100
     df_temp['geom_id'] = ear[Ear_Table_PK]
     haz = None

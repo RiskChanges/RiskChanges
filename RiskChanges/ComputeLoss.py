@@ -67,7 +67,8 @@ def calculateLoss_spprob(exposuretable, costColumn, spprob):
     return losstable_lossonly
 
 
-def ComputeLoss(con, exposureid, lossid, computeonvalue=True, **kwargs):
+def ComputeLoss(con, exposureid, lossid, computecol='Cost', **kwargs):
+    #computeonvalue column has been changed from computation column where 'Cost','Population','Geometry','Count' should be passed. 
     is_aggregated = kwargs.get('is_aggregated', False)
     onlyaggregated = kwargs.get('only_aggregated', False)
     adminid = kwargs.get('adminunit_id', None)
@@ -83,10 +84,15 @@ def ComputeLoss(con, exposureid, lossid, computeonvalue=True, **kwargs):
     spprob_single = metadata["spprob_single"]
     exposure = getHazardMeanIntensity(exposure, stepsize, base)
     exposure = estimatevulnerability(exposure, haztype, vulnColumn, con)
-    if computeonvalue:
+    if computecol=='Cost':
         costColumn = metadata["costColumn"]
-    else:
+    elif computecol=='Population' :
         costColumn = metadata["populColumn"]
+    elif computecol=='Geometry':
+        costColumn='areaOrLen'
+    else :
+        exposure['counts']=1
+        costColumn='counts'
     if spprob == None:
         loss = calculateLoss(exposure, costColumn)
     elif spprob_single:
