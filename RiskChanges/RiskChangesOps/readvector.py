@@ -11,8 +11,12 @@ def readear(connstr, earid):
     schema = metatable.workspace[0]
 
     sql = f'SELECT * FROM {schema}."{eartablename}";'
-    print(sql)
-    ear_table = gpd.read_postgis(sql, con=engine)
+    #print(sql)
+    try:
+        ear_table = gpd.read_postgis(sql, con=engine)
+    except:
+        ear_table = gpd.read_postgis(sql, con=engine,geom_col='geometry')
+        ear_table=ear_table.rename(columns ={'geometry':'geom'})
     engine.close()
     return ear_table
 
@@ -112,7 +116,12 @@ def readAdmin(connstr, adminunit):
     adminpk = meta.data_id[0]
     sql = f'SELECT * FROM {schema}."{admintablename}";'
     # print(sql)
-    ear_table = gpd.read_postgis(sql, con=engine)
+    #ear_table = gpd.read_postgis(sql, con=engine)
+    try:
+        ear_table = gpd.read_postgis(sql, con=engine)
+    except:
+        ear_table = gpd.read_postgis(sql, con=engine,geom_col='geometry')
+        ear_table=ear_table.rename(columns ={'geometry':'geom'})
     engine.close()
     # ear_table=ear_table.rename(columns={adminpk:'ADMIN_ID'})
     return ear_table
