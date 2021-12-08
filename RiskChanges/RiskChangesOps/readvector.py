@@ -16,7 +16,7 @@ def readear(connstr, earid):
         ear_table = gpd.read_postgis(sql, con=engine)
     except:
         ear_table = gpd.read_postgis(sql, con=engine,geom_col='geometry')
-        ear_table=ear_table.rename(columns ={'geometry':'geom'})
+        ear_table=ear_table.rename(columns ={'geometry':'geom'}).set_geometry('geom')
     engine.close()
     return ear_table
 
