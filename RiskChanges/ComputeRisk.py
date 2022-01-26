@@ -1,12 +1,15 @@
 from sklearn.metrics import auc
 import geopandas as gpd
 import pandas as pd
-
+import numpy as np
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
 
 def dutch_method(xx, yy):
     # compute risk based on dutch method where xx is value axis and yy is probability axis
+    args=np.argsort(xx)
+    xx=[xx[i] for i in args]
+    yy=[yy[i] for i in args]
     AAL = auc(yy, xx)+(xx[0]*yy[0])
     return AAL
 
