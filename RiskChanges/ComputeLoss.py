@@ -25,7 +25,7 @@ def estimatevulnerability(exposuretable, haztype, vulnColumn, con):
             subset_exp = pd.merge(left=subset_exp, right=vulnerbaility[[
                                   'vulnAVG', 'mean_x']], how='left', left_on=['class'], right_on=['mean_x'], right_index=False)
             #subset_exp.drop(columns= ['hazIntensity_to'])
-            subset_exp.rename(columns={"vulnAVG": "vuln"})
+            subset_exp=subset_exp.rename(columns={"vulnAVG": "vuln"})
             final_df = pd.DataFrame()
             final_df = final_df.append(subset_exp, ignore_index=True)
         exposuretable = None
