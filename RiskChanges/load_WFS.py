@@ -11,31 +11,19 @@ def LoadWFS(wfsURL, layer_name, connstr, layer_name_db, index, schema):
                   typeName=layer_name, outputFormat='application/json')
 
     u = requests.get(wfsURL, params)
-
     data_url = u.url
 
     # Read data from URL
-    geodataframe = gpd.read_file(data_url)
+    gdf = gpd.read_file(data_url)
+    gdf = gdf[gdf.is_valid]
+    gdf[index] = gdf.index
 
-    crs = geodataframe.crs
-    try:
-        epsg = crs.to_epsg()
-
-    except:
-        print('Warning! Coordinate system manually assigned to 4326. This might affect on visualization of data.')
-        epsg = 4326
-
-    geodataframe[index] = geodataframe.index
+    # Creating SQLAlchemy's engine to use
     engine = create_engine(connstr)
+    gdf.to_postgis(name=layer_name_db, con=engine,
+                   schema=schema, if_exists='replace')
 
-    geodataframe['geom'] = geodataframe['geometry'].apply(
-        lambda x: WKTElement(x.wkt, srid=epsg))
-
-    # drop the geometry column as it is now duplicative
-    geodataframe.drop('geometry', 1, inplace=True)
-
-    geodataframe.to_sql(layer_name_db, engine, schema=schema, if_exists='replace', index=False,
-                        dtype={'geom': Geometry('Geometry', srid=epsg)})
+    # close engine
     engine.dispose()
 
 
