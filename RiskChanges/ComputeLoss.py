@@ -6,12 +6,16 @@ from .RiskChangesOps.readvulnerability import readIntVuln, readSusVuln
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
 
-def getHazardMeanIntensity(exposuretable, stepsize, base):
+def getHazardMeanIntensity(exposuretable, stepsize, base,threshold):
     stepsize = stepsize  # 5 #import from database
     base = base  # 0 #import from database
     half_step = stepsize/2
+    max_intensity=threshold
+    max_class=exposuretable['class'].max()
     exposuretable['meanHazard'] = base + \
         exposuretable['class']*stepsize-half_step
+    exposuretable.loc[exposuretable['class'] == max_class, 'meanHazard']=max_intensity
+    exposuretable['meanHazard']
     return exposuretable
 
 
@@ -77,13 +81,14 @@ def ComputeLoss(con, exposureid, lossid, computecol='Cost', **kwargs):
     metadata = readmeta.computeloss_meta(con, exposureid)
     exposure = readvector.prepareExposureForLoss(con, exposureid)
     base = float(metadata["base"])
+    threshold = float(metadata["threshold"])
     stepsize = float(metadata["stepsize"])
     haztype = metadata["hazintensity"]
     vulnColumn = metadata["vulnColumn"]
     schema = metadata["Schema"]
     spprob = metadata["spprob"]
     spprob_single = metadata["spprob_single"]
-    exposure = getHazardMeanIntensity(exposure, stepsize, base)
+    exposure = getHazardMeanIntensity(exposure, stepsize, base,threshold)
     exposure = estimatevulnerability(exposure, haztype, vulnColumn, con)
     if computecol=='Cost':
         costColumn = metadata["costColumn"]
