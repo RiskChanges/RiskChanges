@@ -10,6 +10,7 @@ from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as 
 # TODO define in the same way as exposure to return all the loss summary and aggregated loss values 
 def getSummary(con,lossid,agg=False):
     metadata = readmeta.readLossMeta(con, lossid)
+    
 #     exposure = readvector.prepareExposureForLoss(con, exposureid)
 #     hazid=metadata.hazid
 #     classificationScheme=readmeta.classificationscheme(con,hazid)
