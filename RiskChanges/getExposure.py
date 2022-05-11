@@ -30,7 +30,7 @@ def getSummary(con,exposureid,agg=False):
     return summary
 
 
-def getShapefile(con,exposureid):
+def getShapefile(con,exposureid,agg=False):
     metadata = readmeta.computeloss_meta(con, exposureid)
     exposure = readvector.prepareExposureForLoss(con, exposureid)
     hazid=metadata.hazid
@@ -38,6 +38,8 @@ def getShapefile(con,exposureid):
     base = float(metadata["base"])
     maxval = float(metadata["threshold"])
     type_col=metadata["TypeColumn"]
+    earpk=metadata["earPK"]
+    earid=metadata['earID']
     stepsize = float(metadata["stepsize"])
     min_thresholds=np.arange(start=base,stop=maxval+stepsize,step=stepsize).tolist()
     convert_dict={}
@@ -46,4 +48,11 @@ def getShapefile(con,exposureid):
         convert_dict[str(i)]=name
     exposure = exposure.astype({"class": str})
     exposure["class"].replace(convert_dict, inplace=True)
-    
+    if not agg:
+        summary=pd.pivot_table(exposure, values='exposed', index=['geom_id'],
+                        columns=["class"], aggfunc=np.sum, fill_value=0)
+    ear = readvector.readear(con, earid)
+    summary = pd.merge(left=summary, right=ear[[
+                    earpk, 'geom']], left_on='geom_id', right_on=earpk, right_index=False)
+    summary = gpd.GeoDataFrame(summary, geometry='geom')                    
+    return summary
