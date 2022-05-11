@@ -15,7 +15,7 @@ def writeexposure(df, connstr, schema):
 
 def writeexposureAgg(df, connstr, schema):
     engine = create_engine(connstr)
-    print(engine)
+    #print(engine)
     df.to_sql('exposure_result_agg', engine, schema,
               if_exists='append', index=False)
     print('data written')
