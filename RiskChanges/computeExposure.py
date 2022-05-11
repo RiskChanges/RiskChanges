@@ -184,6 +184,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         df = aggregator.aggregateexpoure(df, admin_unit, adminpk)
         assert not df.empty, f"The aggregated dataframe in exposure returned empty"
         df['exposure_id'] = expid
+        df=df[['exposed','admin_id','class','exposure_id','exposed_areaOrLen']]
         writevector.writeexposureAgg(df, con, schema)
 
 
