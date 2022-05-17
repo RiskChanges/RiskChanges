@@ -46,7 +46,7 @@ def getShapefile(con, exposureid, agg=False):
     earid = metadata['earID']
     stepsize = float(metadata["stepsize"])
     min_thresholds = np.arange(
-        start=base, stop=maxval+stepsize, step=stepsize).tolist()
+        start=base, stop=maxval, step=stepsize).tolist()
     convert_dict = {}
     for i in min_thresholds:
         name = classificationScheme.query(f'val1 == {i}')[
