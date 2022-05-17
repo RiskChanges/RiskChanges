@@ -23,8 +23,11 @@ def getSummary(con, exposureid, agg=False):
         name = name['class_name'].to_list()[0]
         convert_dict[i] = name
 
+        if (val == min_thresholds[-1]):
+            exposure['class'] = np.where(
+                exposure['class'] >= i, i, exposure['class'])
+
     exposure['class'].replace(convert_dict, inplace=True)
-    print(convert_dict, exposure['class'], 'exposure convert dict')
 
     if not agg:
         summary = pd.pivot_table(exposure, values='areaOrLen', index=[type_col],
