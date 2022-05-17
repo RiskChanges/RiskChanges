@@ -18,13 +18,14 @@ def getSummary(con, exposureid, agg=False):
     min_thresholds = np.arange(
         start=base, stop=maxval, step=stepsize).tolist()
     convert_dict = {}
-    for i in min_thresholds:
-        name = classificationScheme.query(f'val1 == "{i}"')
+    for i, val in enumerate(min_thresholds):
+        name = classificationScheme.query(f'val1 == "{val}"')
         name = name['class_name'].to_list()[0]
-        convert_dict[str(i)] = name
+        convert_dict[i] = name
 
-    exposure = exposure.astype({"class": str})
-    exposure["class"].replace(convert_dict, inplace=True)
+    exposure['class'].replace(convert_dict, inplace=True)
+    print(convert_dict, exposure['class'], 'exposure convert dict')
+
     if not agg:
         summary = pd.pivot_table(exposure, values='areaOrLen', index=[type_col],
                                  columns=["class"], aggfunc=np.sum, fill_value=0)
