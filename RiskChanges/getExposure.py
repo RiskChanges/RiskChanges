@@ -41,7 +41,7 @@ def getSummary(con, exposureid, agg=False):
 def getShapefile(con, exposureid, agg=False):
     metadata = readmeta.computeloss_meta(con, exposureid)
     exposure = readvector.prepareExposureForLoss(con, exposureid)
-    hazid = metadata.hazid
+    hazid = metadata["hazid"]
     classificationScheme = readmeta.classificationscheme(con, hazid)
     base = float(metadata["base"])
     maxval = float(metadata["threshold"])
@@ -52,11 +52,15 @@ def getShapefile(con, exposureid, agg=False):
     min_thresholds = np.arange(
         start=base, stop=maxval, step=stepsize).tolist()
     convert_dict = {}
-    for i in min_thresholds:
-        name = classificationScheme.query(f'val1 == {i}')[
-            'class_name'].to_list()[0]
-        convert_dict[str(i)] = name
-    exposure = exposure.astype({"class": str})
+    for i, val in enumerate(min_thresholds):
+        name = classificationScheme.query(f'val1 == "{val}"')
+        name = name['class_name'].to_list()[0]
+        convert_dict[i] = name
+
+        if (val == min_thresholds[-1]):
+            exposure['class'] = np.where(
+                exposure['class'] >= i, i, exposure['class'])
+
     exposure["class"].replace(convert_dict, inplace=True)
     if not agg:
         summary = pd.pivot_table(exposure, values='exposed', index=['geom_id'],
