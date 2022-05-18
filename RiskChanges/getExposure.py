@@ -15,18 +15,30 @@ def getSummary(con, exposureid, agg=False):
     maxval = float(metadata["threshold"])
     type_col = metadata["TypeColumn"]
     stepsize = float(metadata["stepsize"])
-    min_thresholds = np.arange(
-        start=base, stop=maxval, step=stepsize).tolist()
+    min_thresholds = np.arange(start=base, stop=maxval, step=stepsize).tolist()
     convert_dict = {}
     for i, val in enumerate(min_thresholds):
-        name = classificationScheme.query(f'val1 == "{val}"')
-        name = name['class_name'].to_list()[0]
-        convert_dict[i] = name
 
+        # the default type for val1 is char, change it to float and compare
+        classificationScheme['val1'] = classificationScheme['val1'].astype(
+            float)
+        name = classificationScheme.query(f'val1 == {val}')
+
+        # not every hazard class are avialable on exposure table
+        # so try except to pass even the class is not available
+        try:
+            name = name['class_name'].to_list()[0]
+            convert_dict[i] = name
+
+        except:
+            pass
+
+        # if it is last class, then need to assign max class for all result
         if (val == min_thresholds[-1]):
             exposure['class'] = np.where(
                 exposure['class'] >= i, i, exposure['class'])
 
+    # Change the classes to the user defined class
     exposure['class'].replace(convert_dict, inplace=True)
 
     if not agg:
@@ -53,14 +65,27 @@ def getShapefile(con, exposureid, agg=False):
         start=base, stop=maxval, step=stepsize).tolist()
     convert_dict = {}
     for i, val in enumerate(min_thresholds):
-        name = classificationScheme.query(f'val1 == "{val}"')
-        name = name['class_name'].to_list()[0]
-        convert_dict[i] = name
 
+        # the default type for val1 is char, change it to float and compare
+        classificationScheme['val1'] = classificationScheme['val1'].astype(
+            float)
+        name = classificationScheme.query(f'val1 == {val}')
+
+        # not every hazard class are avialable on exposure table
+        # so try except to pass even the class is not available
+        try:
+            name = name['class_name'].to_list()[0]
+            convert_dict[i] = name
+
+        except:
+            pass
+
+        # if it is last class, then need to assign max class for all result
         if (val == min_thresholds[-1]):
             exposure['class'] = np.where(
                 exposure['class'] >= i, i, exposure['class'])
 
+    # Change the classes to the user defined class
     exposure["class"].replace(convert_dict, inplace=True)
     if not agg:
         summary = pd.pivot_table(exposure, values='exposed', index=['geom_id'],
