@@ -51,8 +51,14 @@ def getShapefile(con,exposureid,agg=False):
     if not agg:
         summary=pd.pivot_table(exposure, values='exposed', index=['geom_id'],
                         columns=["class"], aggfunc=np.sum, fill_value=0)
-    ear = readvector.readear(con, earid)
-    summary = pd.merge(left=summary, right=ear[[
-                    earpk, 'geom']], left_on='geom_id', right_on=earpk, right_index=False)
-    summary = gpd.GeoDataFrame(summary, geometry='geom')                    
+        ear = readvector.readear(con, earid)
+        summary = pd.merge(left=summary, right=ear[[
+                        earpk, 'geom']], left_on='geom_id', right_on=earpk, right_index=False)
+        summary = gpd.GeoDataFrame(summary, geometry='geom')                    
+    else:
+        print('hello')
+        #aggegate based on the column in EAR which might be value, nr people or area.. TODO: change function in aggregation of EAR then use same approach here. 
+        #also depending on the classess 
     return summary
+
+    '''  Change the exposure function to add admin unit name in exposure result if aggregation is true and make OTF funtion to retrive those information.. '''
