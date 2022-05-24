@@ -1,3 +1,4 @@
+from curses import meta
 import geopandas as gpd
 import pandas as pd
 import numpy as np
@@ -6,7 +7,10 @@ from .RiskChangesOps.readvulnerability import readIntVuln, readSusVuln
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
 
-def getSummary(con, exposureid, agg=False):
+def getSummary(con, exposureid,column='areaOrLen',agg=False):
+
+    if column not in ['areaOrLen','valueexp','populationexp']:
+        raise ValueError("column: status must be one of areaOrLen, populationexp or valueexp")
     metadata = readmeta.computeloss_meta(con, exposureid)
     exposure = readvector.prepareExposureForLoss(con, exposureid)
     hazid = metadata['hazid']
@@ -42,15 +46,17 @@ def getSummary(con, exposureid, agg=False):
     exposure['class'].replace(convert_dict, inplace=True)
 
     if not agg:
-        summary = pd.pivot_table(exposure, values='areaOrLen', index=[type_col],
+        summary = pd.pivot_table(exposure, values=column, index=[type_col],
                                  columns=["class"], aggfunc=np.sum, fill_value=0)
     else:
-        summary = pd.pivot_table(exposure, values='exposed_areaOrLen', index=[type_col],
+        summary = pd.pivot_table(exposure, values=column, index=[type_col,'admin_id'],
                                  columns=["class"], aggfunc=np.sum, fill_value=0)
     return summary
 
 
-def getShapefile(con, exposureid, agg=False):
+def getShapefile(con, exposureid,column='exposed',agg=False):
+    if column not in ['exposed','areaOrLen','valueexp','populationexp']:
+        raise ValueError("column: status must be one of exposed %, areaOrLen, populationexp or valueexp")
     metadata = readmeta.computeloss_meta(con, exposureid)
     exposure = readvector.prepareExposureForLoss(con, exposureid)
     hazid = metadata["hazid"]
@@ -58,7 +64,9 @@ def getShapefile(con, exposureid, agg=False):
     base = float(metadata["base"])
     maxval = float(metadata["threshold"])
     type_col = metadata["TypeColumn"]
+    adminid=metadata['adminid']
     earpk = metadata["earPK"]
+    earid = metadata['earID']
     earid = metadata['earID']
     stepsize = float(metadata["stepsize"])
     min_thresholds = np.arange(
@@ -88,23 +96,25 @@ def getShapefile(con, exposureid, agg=False):
     # Change the classes to the user defined class
     exposure["class"].replace(convert_dict, inplace=True)
     if not agg:
-        summary=pd.pivot_table(exposure, values='exposed', index=['geom_id'],
+        summary=pd.pivot_table(exposure, values=column, index=['geom_id'],
                         columns=["class"], aggfunc=np.sum, fill_value=0)
         ear = readvector.readear(con, earid)
-        summary = pd.merge(left=summary, right=ear[[
-                        earpk, 'geom']], left_on='geom_id', right_on=earpk, right_index=False)
+        summary = pd.merge(left=summary, right=ear, left_on='geom_id', right_on=earpk, right_index=False)
         summary = gpd.GeoDataFrame(summary, geometry='geom')                    
     else:
-        print('hello')
-        #aggegate based on the column in EAR which might be value, nr people or area.. TODO: change function in aggregation of EAR then use same approach here. 
-        #also depending on the classess 
-    return summary
+        summary=pd.pivot_table(exposure, values=column, index=['admin_id'],
+                        columns=["class"], aggfunc=np.sum, fill_value=0)
+        admin = readvector.readAdmin(con, adminid)
+        adminmeta=readmeta.getAdminMeta(con,adminid)
+        adminpk=adminmeta.col_admin[0]
+        summary = pd.merge(left=summary, right=admin, left_on='admin_id', right_on=adminpk, right_index=False)
+        summary = gpd.GeoDataFrame(summary, geometry='geom')     
 
-    '''  Change the exposure function to add admin unit name in exposure result if aggregation is true and make OTF funtion to retrive those information.. '''
-        summary = pd.pivot_table(exposure, values='exposed', index=['geom_id'],
-                                 columns=["class"], aggfunc=np.sum, fill_value=0)
-    ear = readvector.readear(con, earid)
-    summary = pd.merge(left=summary, right=ear[[
-        earpk, 'geom']], left_on='geom_id', right_on=earpk, right_index=False)
-    summary = gpd.GeoDataFrame(summary, geometry='geom')
     return summary
+    #     summary = pd.pivot_table(exposure, values='exposed', index=['geom_id'],
+    #                              columns=["class"], aggfunc=np.sum, fill_value=0)
+    # ear = readvector.readear(con, earid)
+    # summary = pd.merge(left=summary, right=ear[[
+    #     earpk, 'geom']], left_on='geom_id', right_on=earpk, right_index=False)
+    # summary = gpd.GeoDataFrame(summary, geometry='geom')
+    # return summary

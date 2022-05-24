@@ -138,7 +138,7 @@ def pointExposure(ear, haz, expid, Ear_Table_PK):
 
 def ComputeExposure(con, earid, hazid, expid, **kwargs):
     is_aggregated = kwargs.get('is_aggregated', False)
-    onlyaggregated = kwargs.get('only_aggregated', False)
+    onlyaggregated = kwargs.get('only_aggregated', True)
     adminid = kwargs.get('adminunit_id', None)
     haz_file = kwargs.get('haz_file', None)
 
@@ -153,8 +153,17 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
 
     metatable = readmeta.earmeta(con, earid)
     Ear_Table_PK = metatable.data_id[0]
+    value_col=metatable.col_value_avg[0]
+    pop_col=metatable.col_population_avg[0]
     schema = metatable.workspace[0]
     geometrytype = ear.geom_type.unique()[0]
+
+    default_cols=['exposed','admin_id','class','exposure_id','areaOrLen']
+    if (value_col !=None) | (value_col!=''):
+        default_cols.append(value_col)
+    if (pop_col !=None) | (pop_col!=''):
+        default_cols.append(value_col)
+
     print(geometrytype)
     if (geometrytype == 'Polygon' or geometrytype == 'MultiPolygon'):
         ear['areacheck'] = ear.geom.area
@@ -171,21 +180,44 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
         df = lineExposure(ear, haz, expid, Ear_Table_PK)
     haz = None
-    if not onlyaggregated:
-        writevector.writeexposure(df, con, schema)
+    # if not onlyaggregated: #due to change of 24 may 2022, it is redundant now because of else statement in coming condition. 
+    #     df['exposure_id'] = expid
+    #     writevector.writeexposure(df, con, schema)
+
     if is_aggregated:
         admin_unit = readAdmin(con, adminid)
         adminmeta = readmeta.getAdminMeta(con, adminid)
         adminpk = adminmeta.data_id[0]
-        df = pd.merge(left=df, right=ear[[
-                      Ear_Table_PK, 'geom']], left_on='geom_id', right_on=Ear_Table_PK, right_index=False)
+        df = pd.merge(left=df, right=ear, left_on='geom_id', right_on=Ear_Table_PK, right_index=False) 
         assert not df.empty, f"The aggregated dataframe in exposure returned empty"
-        df = gpd.GeoDataFrame(df, geometry='geom')
-        df = aggregator.aggregateexpoure(df, admin_unit, adminpk)
-        assert not df.empty, f"The aggregated dataframe in exposure returned empty"
+        df = gpd.GeoDataFrame(df, geometry='geom')    
+        overlaid_Data = gpd.overlay(df, admin_unit[[adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
+        df=overlaid_Data.rename(columns={adminpk:'admin_id'})
         df['exposure_id'] = expid
-        df=df[['exposed','admin_id','class','exposure_id','exposed_areaOrLen']]
-        writevector.writeexposureAgg(df, con, schema)
+        df=df[default_cols]
+        df=df.rename(columns={value_col: "valueexp", pop_col: "populationexp"})
+        df['areaOrLen']=df['exposed'] * df['areaOrLen']/100
+        df['value']=df['exposed'] * df['value']/100
+        df['population']=df['exposed'] * df['population']/100
+        writevector.writeexposure(df, con, schema)
+
+    else:
+        writevector.writeexposure(df, con, schema)
+
+    #************Below is the existing aggregation function written till 24 may 2022. Now we changed it to store in single table**************#
+    # if is_aggregated:
+    #     admin_unit = readAdmin(con, adminid)
+    #     adminmeta = readmeta.getAdminMeta(con, adminid)
+    #     adminpk = adminmeta.data_id[0]
+    #     df = pd.merge(left=df, right=ear[[
+    #                   Ear_Table_PK, 'geom']], left_on='geom_id', right_on=Ear_Table_PK, right_index=False)
+    #     assert not df.empty, f"The aggregated dataframe in exposure returned empty"
+    #     df = gpd.GeoDataFrame(df, geometry='geom')
+    #     df = aggregator.aggregateexpoure(df, admin_unit, adminpk)
+    #     assert not df.empty, f"The aggregated dataframe in exposure returned empty"
+    #     df['exposure_id'] = expid
+    #     df=df[['exposed','admin_id','class','exposure_id','exposed_areaOrLen']]
+    #     writevector.writeexposureAgg(df, con, schema)
 
 
 # kwargs should have an argument for aggregation, admin unit id and save aggregate only or not

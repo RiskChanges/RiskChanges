@@ -62,6 +62,7 @@ def loadspprob(connstr,hazardid):
 def computeloss_meta(connstr,exposureid):
     #get it from exposure
     meta=exposuremeta(connstr,exposureid)
+    adminid=meta.admin_unit_id[0]
     exposureTable=meta.exposure_table[0]
     earID=meta.ear_index_id[0]
     hazid=meta.hazard_index_id[0]
@@ -88,7 +89,7 @@ def computeloss_meta(connstr,exposureid):
         spprob=loadspprob(connstr,hazid)
         #spprob=spprob.set_index('sp_map_value')['sp'].to_dict()
         spprob_single=False
-    lossmeta={'spprob':spprob,'spprob_single':spprob_single,'exposureTable':exposureTable,'earID':earID,'hazid':hazid,'earPK':earPK,'Schema':Schema,'costColumn':costColumn,'populColumn':populColumn,'TypeColumn':TypeColumn,'hazunit':hazunit,'hazintensity':hazintensity,'base':base,'stepsize':stepsize,'vulnColumn':vulnColumn,'threshold':threshold}
+    lossmeta={'spprob':spprob,'spprob_single':spprob_single,'exposureTable':exposureTable,'earID':earID,'hazid':hazid,'earPK':earPK,'Schema':Schema,'costColumn':costColumn,'populColumn':populColumn,'TypeColumn':TypeColumn,'hazunit':hazunit,'hazintensity':hazintensity,'base':base,'stepsize':stepsize,'vulnColumn':vulnColumn,'threshold':threshold,'adminid':adminid}
     return lossmeta
 
 def readLossMeta(connstr,lossid):
