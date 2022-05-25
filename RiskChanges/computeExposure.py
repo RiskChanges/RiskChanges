@@ -158,7 +158,8 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     schema = metatable.workspace[0]
     geometrytype = ear.geom_type.unique()[0]
 
-    default_cols = ['exposed', 'admin_id', 'class', 'exposure_id', 'areaOrLen']
+    default_cols = ['exposed', 'admin_id', 'class',
+                    'exposure_id', 'geom_id', 'areaOrLen']
     if (value_col != None) | (value_col != ''):
         default_cols.append(value_col)
     if (pop_col != None) | (pop_col != ''):
