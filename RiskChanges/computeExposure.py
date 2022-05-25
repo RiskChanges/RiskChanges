@@ -153,16 +153,16 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
 
     metatable = readmeta.earmeta(con, earid)
     Ear_Table_PK = metatable.data_id[0]
-    value_col=metatable.col_value_avg[0]
-    pop_col=metatable.col_population_avg[0]
+    value_col = metatable.col_value_avg[0]
+    pop_col = metatable.col_population_avg[0]
     schema = metatable.workspace[0]
     geometrytype = ear.geom_type.unique()[0]
 
-    default_cols=['exposed','admin_id','class','exposure_id','areaOrLen']
-    if (value_col !=None) | (value_col!=''):
+    default_cols = ['exposed', 'admin_id', 'class', 'exposure_id', 'areaOrLen']
+    if (value_col != None) | (value_col != ''):
         default_cols.append(value_col)
-    if (pop_col !=None) | (pop_col!=''):
-        default_cols.append(value_col)
+    if (pop_col != None) | (pop_col != ''):
+        default_cols.append(pop_col)
 
     print(geometrytype)
     if (geometrytype == 'Polygon' or geometrytype == 'MultiPolygon'):
@@ -180,7 +180,12 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
         df = lineExposure(ear, haz, expid, Ear_Table_PK)
     haz = None
-    # if not onlyaggregated: #due to change of 24 may 2022, it is redundant now because of else statement in coming condition. 
+
+    df = pd.merge(left=df, right=ear, left_on='geom_id',
+                  right_on=Ear_Table_PK, right_index=False)
+    assert not df.empty, f"The aggregated dataframe in exposure returned empty"
+    df = gpd.GeoDataFrame(df, geometry='geom')
+    # if not onlyaggregated: #due to change of 24 may 2022, it is redundant now because of else statement in coming condition.
     #     df['exposure_id'] = expid
     #     writevector.writeexposure(df, con, schema)
 
@@ -188,21 +193,28 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         admin_unit = readAdmin(con, adminid)
         adminmeta = readmeta.getAdminMeta(con, adminid)
         adminpk = adminmeta.data_id[0]
-        df = pd.merge(left=df, right=ear, left_on='geom_id', right_on=Ear_Table_PK, right_index=False) 
-        assert not df.empty, f"The aggregated dataframe in exposure returned empty"
-        df = gpd.GeoDataFrame(df, geometry='geom')    
-        overlaid_Data = gpd.overlay(df, admin_unit[[adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
-        df=overlaid_Data.rename(columns={adminpk:'admin_id'})
-        df['exposure_id'] = expid
-        df=df[default_cols]
-        df=df.rename(columns={value_col: "valueexp", pop_col: "populationexp"})
-        df['areaOrLen']=df['exposed'] * df['areaOrLen']/100
-        df['value']=df['exposed'] * df['value']/100
-        df['population']=df['exposed'] * df['population']/100
-        writevector.writeexposure(df, con, schema)
+        admin_unit = gpd.GeoDataFrame(admin_unit, geometry='geom')
+        overlaid_Data = gpd.overlay(df, admin_unit[[
+                                    adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
+        df = overlaid_Data.rename(columns={adminpk: 'admin_id'})
 
+    # if exposure is on individual item, admin_unit must be none
     else:
-        writevector.writeexposure(df, con, schema)
+        df['admin_id'] = ''
+
+    df = df[default_cols]
+    df['exposure_id'] = expid
+
+    # default columns for standard database table
+    df = df.rename(columns={value_col: "value_exposure",
+                            pop_col: "population_exposure"})
+    df['areaOrLen'] = df['exposed'] * df['areaOrLen']/100
+    df['value_exposure'] = df['exposed'] * df['value_exposure']/100
+    df['population_exposure'] = df['exposed'] * df['population_exposure']/100
+    writevector.writeexposure(df, con, schema)
+
+    # else:
+    #     writevector.writeexposure(df, con, schema)
 
     #************Below is the existing aggregation function written till 24 may 2022. Now we changed it to store in single table**************#
     # if is_aggregated:
