@@ -45,7 +45,6 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
 
     # Change the classes to the user defined class
     exposure['class'].replace(convert_dict, inplace=True)
-    print(exposure.head())
 
     if not agg:
         summary = pd.pivot_table(exposure, values=column, index=[type_col],
