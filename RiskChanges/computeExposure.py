@@ -193,7 +193,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     if is_aggregated:
         admin_unit = readAdmin(con, adminid)
         adminmeta = readmeta.getAdminMeta(con, adminid)
-        adminpk = adminmeta.data_id[0]
+        adminpk = adminmeta.col_admin[0] or adminmeta.data_id[0]
         admin_unit = gpd.GeoDataFrame(admin_unit, geometry='geom')
         overlaid_Data = gpd.overlay(df, admin_unit[[
                                     adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
@@ -203,6 +203,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     else:
         df['admin_id'] = ''
 
+    print('default_columns', default_cols)
     df = df[default_cols]
     df['exposure_id'] = expid
 

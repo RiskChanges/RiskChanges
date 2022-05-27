@@ -8,9 +8,9 @@ from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as 
 
 def getSummary(con, exposureid, column='areaOrLen', agg=False):
 
-    if column not in ['areaOrLen', 'valueexp', 'populationexp']:
+    if column not in ['areaOrLen', 'value_exposure', 'population_exposure']:
         raise ValueError(
-            "column: status must be one of areaOrLen, populationexp or valueexp")
+            "column: status must be one of areaOrLen, value_exposure or population_exposure")
     metadata = readmeta.computeloss_meta(con, exposureid)
     exposure = readvector.prepareExposureForLoss(con, exposureid)
     hazid = metadata['hazid']
@@ -19,7 +19,8 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
     maxval = float(metadata["threshold"])
     type_col = metadata["TypeColumn"]
     stepsize = float(metadata["stepsize"])
-    min_thresholds = np.arange(start=base, stop=maxval, step=stepsize).tolist()
+    min_thresholds = np.arange(
+        start=base, stop=maxval+1, step=stepsize).tolist()
     convert_dict = {}
     for i, val in enumerate(min_thresholds):
 
@@ -49,16 +50,21 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
     if not agg:
         summary = pd.pivot_table(exposure, values=column, index=[type_col],
                                  columns=["class"], aggfunc=np.sum, fill_value=0)
+        summary = summary.reset_index()
+        summary = summary.rename(columns={type_col: "Ear Class"})
     else:
         summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
                                  columns=["class"], aggfunc=np.sum, fill_value=0)
+        summary = summary.reset_index()
+        summary = summary.rename(
+            columns={type_col: "Ear Class", "admin_id": "Admin Name"})
     return summary
 
 
 def getShapefile(con, exposureid, column='exposed', agg=False):
-    if column not in ['exposed', 'areaOrLen', 'valueexp', 'populationexp']:
+    if column not in ['areaOrLen', 'value_exposure', 'population_exposure']:
         raise ValueError(
-            "column: status must be one of exposed %, areaOrLen, populationexp or valueexp")
+            "column: status must be one of areaOrLen, value_exposure or population_exposure")
     metadata = readmeta.computeloss_meta(con, exposureid)
     exposure = readvector.prepareExposureForLoss(con, exposureid)
     hazid = metadata["hazid"]
@@ -72,7 +78,7 @@ def getShapefile(con, exposureid, column='exposed', agg=False):
     earid = metadata['earID']
     stepsize = float(metadata["stepsize"])
     min_thresholds = np.arange(
-        start=base, stop=maxval, step=stepsize).tolist()
+        start=base, stop=maxval+1, step=stepsize).tolist()
     convert_dict = {}
     for i, val in enumerate(min_thresholds):
 
@@ -121,9 +127,9 @@ def getShapefile(con, exposureid, column='exposed', agg=False):
 
 def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
 
-    if column not in ['areaOrLen', 'valueexp', 'populationexp']:
+    if column not in ['areaOrLen', 'value_exposure', 'population_exposure']:
         raise ValueError(
-            "column: status must be one of areaOrLen, populationexp or valueexp")
+            "column: status must be one of areaOrLen, value_exposure or population_exposure")
     metadata = readmeta.computeloss_meta(con, exposureid)
     exposure = readvector.prepareExposureForLoss(con, exposureid)
     hazid = metadata['hazid']
@@ -134,7 +140,8 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
     maxval = float(metadata["threshold"])
     type_col = metadata["TypeColumn"]
     stepsize = float(metadata["stepsize"])
-    min_thresholds = np.arange(start=base, stop=maxval, step=stepsize).tolist()
+    min_thresholds = np.arange(
+        start=base, stop=maxval+1, step=stepsize).tolist()
     convert_dict = {}
     if column == 'populationexp':
         aggcolumn = popcol
@@ -174,6 +181,10 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
                            left_on=type_col, right_on=type_col)
         summary[summary.columns.difference([aggcolumn])] = summary[summary.columns.difference([
             aggcolumn])].div(summary[aggcolumn], axis=0)*100
+
+        summary = summary.reset_index()
+        summary = summary.rename(columns={type_col: "Ear Class"})
+
     else:
         summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
                                  columns=["class"], aggfunc=np.sum, fill_value=0)
@@ -182,6 +193,10 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
         summary = pd.merge(summary, agg, 'left', on=['admin_id', type_col])
         summary[summary.columns.difference([aggcolumn])] = summary[summary.columns.difference([
             aggcolumn])].div(summary[aggcolumn], axis=0)*100
+
+        summary = summary.reset_index()
+        summary = summary.rename(
+            columns={type_col: "Ear Class", "admin_id": "Admin Name"})
     return summary
 
 
@@ -202,7 +217,7 @@ def getShapefileRel(con, exposureid, column='exposed', agg=False):
     earid = metadata['earID']
     stepsize = float(metadata["stepsize"])
     min_thresholds = np.arange(
-        start=base, stop=maxval, step=stepsize).tolist()
+        start=base, stop=maxval+1, step=stepsize).tolist()
     convert_dict = {}
     costcol = metadata['costColumn']
     popcol = metadata['populColumn']
