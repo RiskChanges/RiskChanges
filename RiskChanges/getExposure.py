@@ -142,9 +142,9 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
     min_thresholds = np.arange(
         start=base, stop=maxval+1, step=stepsize).tolist()
     convert_dict = {}
-    if column == 'populationexp':
+    if column == 'population_exposure':
         aggcolumn = popcol
-    elif column == 'valueexp':
+    elif column == 'value_exposure':
         aggcolumn = costcol
     else:
         aggcolumn = 'areaOrLen'
@@ -200,7 +200,7 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
 
 
 def getShapefileRel(con, exposureid, column='exposed', agg=False):
-    if column not in ['exposed', 'areaOrLen', 'valueexp', 'populationexp']:
+    if column not in ['exposed', 'areaOrLen', 'value_exposure', 'population_exposure']:
         raise ValueError(
             "column: status must be one of exposed %, areaOrLen, populationexp or valueexp")
     metadata = readmeta.computeloss_meta(con, exposureid)
@@ -220,9 +220,9 @@ def getShapefileRel(con, exposureid, column='exposed', agg=False):
     convert_dict = {}
     costcol = metadata['costColumn']
     popcol = metadata['populColumn']
-    if column == 'populationexp':
+    if column == 'population_exposure':
         aggcolumn = popcol
-    elif column == 'valueexp':
+    elif column == 'value_exposure':
         aggcolumn = costcol
     else:
         aggcolumn = 'areaOrLen'
@@ -251,7 +251,7 @@ def getShapefileRel(con, exposureid, column='exposed', agg=False):
     exposure["class"].replace(convert_dict, inplace=True)
     if not agg:
         # this is always relative
-        summary = pd.pivot_table(exposure, values='exposure', index=['geom_id'],
+        summary = pd.pivot_table(exposure, values=column, index=['geom_id'],
                                  columns=["class"], aggfunc=np.sum, fill_value=0)
         ear = readvector.readear(con, earid)
         summary = pd.merge(left=summary, right=ear,
