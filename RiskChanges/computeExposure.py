@@ -179,18 +179,22 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         pop_col = 'pop_col'
         additional_cols.append(pop_col)
 
+    # check the geometry and run the corresponding calcualtion function
     if (geometrytype == 'Polygon' or geometrytype == 'MultiPolygon'):
         ear['areacheck'] = ear.geom.area
         mean_area = ear.areacheck.mean()
+
+        # polygon exposure
         if mean_area <= 0:
             ear['geom'] = ear['geom'].centroid
             df = pointExposure(ear, haz, expid, Ear_Table_PK)
         else:
             df = polygonExposure(ear, haz, expid, Ear_Table_PK)
-
+    # point exposure
     elif(geometrytype == 'Point' or geometrytype == 'MultiPoint'):
         df = pointExposure(ear, haz, expid, Ear_Table_PK)
 
+    # line exposure
     elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
         df = lineExposure(ear, haz, expid, Ear_Table_PK)
     haz = None
