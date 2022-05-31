@@ -164,7 +164,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     # if value and population column is available, add these to default cols
     # else just add the additional column, we will add null values for these additional cols
     additional_cols = []
-    if (value_col != None or value_col != ''):
+    if (value_col != None and value_col != ''):
         default_cols.append(value_col)
     else:
         print('Value colume is not linked!')
@@ -172,7 +172,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         additional_cols.append(value_col)
 
     # doing same for population
-    if (pop_col != None or pop_col != ''):
+    if (pop_col != None and pop_col != ''):
         default_cols.append(pop_col)
     else:
         print("population colume is not lined!")
