@@ -160,12 +160,25 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
 
     default_cols = ['exposed', 'admin_id', 'class',
                     'exposure_id', 'geom_id', 'areaOrLen']
-    if (value_col != None) | (value_col != ''):
-        default_cols.append(value_col)
-    if (pop_col != None) | (pop_col != ''):
-        default_cols.append(pop_col)
 
-    print(geometrytype)
+    # if value and population column is available, add these to default cols
+    # else just add the additional column, we will add null values for these additional cols
+    additional_cols = []
+    if (value_col != None or value_col != ''):
+        default_cols.append(value_col)
+    else:
+        print('Value colume is not linked!')
+        value_col = 'value_col'
+        additional_cols.append(value_col)
+
+    # doing same for population
+    if (pop_col != None or pop_col != ''):
+        default_cols.append(pop_col)
+    else:
+        print("population colume is not lined!")
+        pop_col = 'pop_col'
+        additional_cols.append(pop_col)
+
     if (geometrytype == 'Polygon' or geometrytype == 'MultiPolygon'):
         ear['areacheck'] = ear.geom.area
         mean_area = ear.areacheck.mean()
@@ -206,6 +219,13 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     print('default_columns', default_cols)
     df = df[default_cols]
     df['exposure_id'] = expid
+
+    # if value col and pop col are not defined, we assign the value to nan
+    if len(additional_cols) > 0:
+        if value_col in additional_cols:
+            df[value_col] = np.nan
+        if pop_col in additional_cols:
+            df[pop_col] = np.nan
 
     # default columns for standard database table
     df = df.rename(columns={value_col: "value_exposure",
