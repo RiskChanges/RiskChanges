@@ -212,6 +212,12 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         adminmeta = readmeta.getAdminMeta(con, adminid)
         adminpk = adminmeta.col_admin[0] or adminmeta.data_id[0]
         admin_unit = gpd.GeoDataFrame(admin_unit, geometry='geom')
+
+        # check whether adminpk and ear columns have same name, issue #80
+        df_columns = list(df.columns)
+        if adminpk in df_columns:
+            df = df.rename(columns={adminpk: f"{adminpk}_ear"})
+
         overlaid_Data = gpd.overlay(df, admin_unit[[
                                     adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
         df = overlaid_Data.rename(columns={adminpk: 'admin_id'})
