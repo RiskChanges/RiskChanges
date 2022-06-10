@@ -8,7 +8,7 @@ from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as 
 
 def getSummary(con, exposureid, column='areaOrLen', agg=False):
 
-    if column not in ['areaOrLen', 'value_exposure', 'population_exposure']:
+    if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
         raise ValueError(
             "column: status must be one of areaOrLen, value_exposure or population_exposure")
     metadata = readmeta.computeloss_meta(con, exposureid)
@@ -46,6 +46,10 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
     # Change the classes to the user defined class
     exposure['class'].replace(convert_dict, inplace=True)
 
+    # if column is count just count the number of feature exposed
+    if column == 'count':
+        exposure[column] = 1
+
     if not agg:
         summary = pd.pivot_table(exposure, values=column, index=[type_col],
                                  columns=["class"], aggfunc=np.sum, fill_value=0)
@@ -61,7 +65,7 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
 
 
 def getShapefile(con, exposureid, column='exposed', agg=False):
-    if column not in ['areaOrLen', 'value_exposure', 'population_exposure']:
+    if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
         raise ValueError(
             "column: status must be one of areaOrLen, value_exposure or population_exposure")
     metadata = readmeta.computeloss_meta(con, exposureid)
@@ -102,6 +106,11 @@ def getShapefile(con, exposureid, column='exposed', agg=False):
 
     # Change the classes to the user defined class
     exposure["class"].replace(convert_dict, inplace=True)
+
+    # if column is count just count the number of feature exposed
+    if column == 'count':
+        exposure[column] = 1
+
     if not agg:
         summary = pd.pivot_table(exposure, values=column, index=['geom_id'],
                                  columns=["class"], aggfunc=np.sum, fill_value=0)
@@ -126,7 +135,7 @@ def getShapefile(con, exposureid, column='exposed', agg=False):
 
 def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
 
-    if column not in ['areaOrLen', 'value_exposure', 'population_exposure']:
+    if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
         raise ValueError(
             "column: status must be one of areaOrLen, value_exposure or population_exposure")
     metadata = readmeta.computeloss_meta(con, exposureid)
@@ -172,6 +181,10 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
     # Change the classes to the user defined class
     exposure['class'].replace(convert_dict, inplace=True)
 
+    # if column is count just count the number of feature exposed
+    if column == 'count':
+        exposure[column] = 1
+
     if not agg:
         summary = pd.pivot_table(exposure, values=column, index=[type_col],
                                  columns=["class"], aggfunc=np.sum, fill_value=0)
@@ -200,7 +213,7 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
 
 
 def getShapefileRel(con, exposureid, column='exposed', agg=False):
-    if column not in ['exposed', 'areaOrLen', 'value_exposure', 'population_exposure']:
+    if column not in ['exposed', 'areaOrLen', 'value_exposure', 'population_exposure', 'count']:
         raise ValueError(
             "column: status must be one of exposed %, areaOrLen, populationexp or valueexp")
     metadata = readmeta.computeloss_meta(con, exposureid)
@@ -249,6 +262,11 @@ def getShapefileRel(con, exposureid, column='exposed', agg=False):
 
     # Change the classes to the user defined class
     exposure["class"].replace(convert_dict, inplace=True)
+
+    # if column is count just count the number of feature exposed
+    if column == 'count':
+        exposure[column] = 1
+
     if not agg:
         # this is always relative
         summary = pd.pivot_table(exposure, values=column, index=['geom_id'],
