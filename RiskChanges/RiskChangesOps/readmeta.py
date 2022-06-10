@@ -12,6 +12,17 @@ def earmeta(connstr,earid):
     assert not metatable.empty , f"The EAR id {earid} do not exists"
     return metatable
 
+def classificationscheme(connstr,hazid):
+    try: 
+        engine=psycopg2.connect(connstr)
+    except :
+        print("unable to create connection")
+    sql_val=f'SELECT * FROM public."projectIndex_intensityclass" as classtable WHERE classtable.hazard_id={hazid};'
+    classtable=pd.read_sql(sql_val,engine)
+    engine.close()
+    assert not classtable.empty , f"The classification scheme for hazard id  {hazid} do not exists"
+    return classtable
+
 def hazmeta(connstr,hazid):
     try: 
         engine=psycopg2.connect(connstr)
@@ -51,6 +62,7 @@ def loadspprob(connstr,hazardid):
 def computeloss_meta(connstr,exposureid):
     #get it from exposure
     meta=exposuremeta(connstr,exposureid)
+    adminid=meta.admin_unit_id[0]
     exposureTable=meta.exposure_table[0]
     earID=meta.ear_index_id[0]
     hazid=meta.hazard_index_id[0]
@@ -68,6 +80,7 @@ def computeloss_meta(connstr,exposureid):
     hazunit=metahaz.unit[0]
     hazintensity=metahaz.intensity[0]
     base=metahaz.base_val[0]
+    threshold=metahaz.threshold_val[0]
     stepsize=metahaz.interval_val[0]
     vulnColumn=metahaz.type[0]
     spprob=metahaz.sp_val[0]
@@ -76,7 +89,7 @@ def computeloss_meta(connstr,exposureid):
         spprob=loadspprob(connstr,hazid)
         #spprob=spprob.set_index('sp_map_value')['sp'].to_dict()
         spprob_single=False
-    lossmeta={'spprob':spprob,'spprob_single':spprob_single,'exposureTable':exposureTable,'earID':earID,'hazid':hazid,'earPK':earPK,'Schema':Schema,'costColumn':costColumn,'populColumn':populColumn,'TypeColumn':TypeColumn,'hazunit':hazunit,'hazintensity':hazintensity,'base':base,'stepsize':stepsize,'vulnColumn':vulnColumn}
+    lossmeta={'spprob':spprob,'spprob_single':spprob_single,'exposureTable':exposureTable,'earID':earID,'hazid':hazid,'earPK':earPK,'Schema':Schema,'costColumn':costColumn,'populColumn':populColumn,'TypeColumn':TypeColumn,'hazunit':hazunit,'hazintensity':hazintensity,'base':base,'stepsize':stepsize,'vulnColumn':vulnColumn,'threshold':threshold,'adminid':adminid}
     return lossmeta
 
 def readLossMeta(connstr,lossid):

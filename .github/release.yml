@@ -1,0 +1,9 @@
+changelog:
+  categories:
+    - title: What's Changed?
+      labels:
+        - "*"
+  issues:
+    - title: Closed issue
+      labels:
+        - "*"

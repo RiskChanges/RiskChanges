@@ -18,6 +18,7 @@ def aggregateexpoure(exposure, adminunit, adminpk):
             [adminpk, 'class'], as_index=False).agg({'exposed': 'count'})
     # print(df_aggregated.head())
     # df_aggregated = pd.DataFrame(df_aggregated.drop(columns='geom'))
+    df_aggregated = df_aggregated.rename(columns={adminpk:'admin_id'})
     return df_aggregated
 
 

@@ -6,12 +6,16 @@ from .RiskChangesOps.readvulnerability import readIntVuln, readSusVuln
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
 
-def getHazardMeanIntensity(exposuretable, stepsize, base):
+def getHazardMeanIntensity(exposuretable, stepsize, base,threshold):
     stepsize = stepsize  # 5 #import from database
     base = base  # 0 #import from database
     half_step = stepsize/2
+    max_intensity=threshold
+    max_class=exposuretable['class'].max()
     exposuretable['meanHazard'] = base + \
         exposuretable['class']*stepsize-half_step
+    exposuretable.loc[exposuretable['class'] == max_class, 'meanHazard']=max_intensity
+    exposuretable['meanHazard']
     return exposuretable
 
 
@@ -25,7 +29,8 @@ def estimatevulnerability(exposuretable, haztype, vulnColumn, con):
             subset_exp = pd.merge(left=subset_exp, right=vulnerbaility[[
                                   'vulnAVG', 'mean_x']], how='left', left_on=['class'], right_on=['mean_x'], right_index=False)
             #subset_exp.drop(columns= ['hazIntensity_to'])
-            subset_exp.rename(columns={"vulnAVG": "vuln"})
+            subset_exp=subset_exp.rename(columns={"vulnAVG": "vuln"})
+            final_df = pd.DataFrame()
             final_df = final_df.append(subset_exp, ignore_index=True)
         exposuretable = None
         exposuretable = final_df
@@ -67,7 +72,8 @@ def calculateLoss_spprob(exposuretable, costColumn, spprob):
     return losstable_lossonly
 
 
-def ComputeLoss(con, exposureid, lossid, computeonvalue=True, **kwargs):
+def ComputeLoss(con, exposureid, lossid, computecol='Cost', **kwargs):
+    #computeonvalue column has been changed from computation column where 'Cost','Population','Geometry','Count' should be passed. 
     is_aggregated = kwargs.get('is_aggregated', False)
     onlyaggregated = kwargs.get('only_aggregated', False)
     adminid = kwargs.get('adminunit_id', None)
@@ -75,18 +81,24 @@ def ComputeLoss(con, exposureid, lossid, computeonvalue=True, **kwargs):
     metadata = readmeta.computeloss_meta(con, exposureid)
     exposure = readvector.prepareExposureForLoss(con, exposureid)
     base = float(metadata["base"])
+    threshold = float(metadata["threshold"])
     stepsize = float(metadata["stepsize"])
     haztype = metadata["hazintensity"]
     vulnColumn = metadata["vulnColumn"]
     schema = metadata["Schema"]
     spprob = metadata["spprob"]
     spprob_single = metadata["spprob_single"]
-    exposure = getHazardMeanIntensity(exposure, stepsize, base)
+    exposure = getHazardMeanIntensity(exposure, stepsize, base,threshold)
     exposure = estimatevulnerability(exposure, haztype, vulnColumn, con)
-    if computeonvalue:
+    if computecol=='Cost':
         costColumn = metadata["costColumn"]
-    else:
+    elif computecol=='Population' :
         costColumn = metadata["populColumn"]
+    elif computecol=='Geometry':
+        costColumn='areaOrLen'
+    else :
+        exposure['counts']=1
+        costColumn='counts'
     if spprob == None:
         loss = calculateLoss(exposure, costColumn)
     elif spprob_single:
