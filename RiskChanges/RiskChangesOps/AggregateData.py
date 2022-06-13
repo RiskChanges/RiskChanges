@@ -18,16 +18,16 @@ def aggregateexpoure(exposure, adminunit, adminpk):
             [adminpk, 'class'], as_index=False).agg({'exposed': 'count'})
     # print(df_aggregated.head())
     # df_aggregated = pd.DataFrame(df_aggregated.drop(columns='geom'))
-    df_aggregated = df_aggregated.rename(columns={adminpk:'admin_id'})
+    df_aggregated = df_aggregated.rename(columns={adminpk: 'admin_id'})
     return df_aggregated
 
 
-def aggregateloss(loss, adminunit, adminpk):
+def aggregateloss(loss, adminunit, adminpk, admin_dataid):
     overlaid_Data = gpd.overlay(
-        loss, adminunit[[adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
+        loss, adminunit[[adminpk, admin_dataid, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
     # ADMIN_ID
     df_aggregated = overlaid_Data.groupby(
-        [adminpk], as_index=False).agg({'loss': 'sum'})
+        [adminpk, admin_dataid], as_index=False).agg({'loss': 'sum'})
     # df_aggregated = pd.DataFrame(df_aggregated.drop(columns='geom'))
     return df_aggregated
 

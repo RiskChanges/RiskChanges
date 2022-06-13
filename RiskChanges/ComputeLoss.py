@@ -6,15 +6,16 @@ from .RiskChangesOps.readvulnerability import readIntVuln, readSusVuln
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
 
-def getHazardMeanIntensity(exposuretable, stepsize, base,threshold):
+def getHazardMeanIntensity(exposuretable, stepsize, base, threshold):
     stepsize = stepsize  # 5 #import from database
     base = base  # 0 #import from database
     half_step = stepsize/2
-    max_intensity=threshold
-    max_class=exposuretable['class'].max()
+    max_intensity = threshold
+    max_class = exposuretable['class'].max()
     exposuretable['meanHazard'] = base + \
         exposuretable['class']*stepsize-half_step
-    exposuretable.loc[exposuretable['class'] == max_class, 'meanHazard']=max_intensity
+    exposuretable.loc[exposuretable['class'] ==
+                      max_class, 'meanHazard'] = max_intensity
     exposuretable['meanHazard']
     return exposuretable
 
@@ -29,7 +30,7 @@ def estimatevulnerability(exposuretable, haztype, vulnColumn, con):
             subset_exp = pd.merge(left=subset_exp, right=vulnerbaility[[
                                   'vulnAVG', 'mean_x']], how='left', left_on=['class'], right_on=['mean_x'], right_index=False)
             #subset_exp.drop(columns= ['hazIntensity_to'])
-            subset_exp=subset_exp.rename(columns={"vulnAVG": "vuln"})
+            subset_exp = subset_exp.rename(columns={"vulnAVG": "vuln"})
             final_df = pd.DataFrame()
             final_df = final_df.append(subset_exp, ignore_index=True)
         exposuretable = None
@@ -72,15 +73,15 @@ def calculateLoss_spprob(exposuretable, costColumn, spprob):
     return losstable_lossonly
 
 
-def ComputeLoss(con, exposureid, lossid, computecol='Cost', **kwargs):
-    #computeonvalue column has been changed from computation column where 'Cost','Population','Geometry','Count' should be passed. 
+def ComputeLoss(con, exposureid, lossid, computecol='counts', **kwargs):
+    # computeonvalue column has been changed from computation column where 'Cost','Population','Geometry','Count' should be passed.
     is_aggregated = kwargs.get('is_aggregated', False)
     onlyaggregated = kwargs.get('only_aggregated', False)
     adminid = kwargs.get('adminunit_id', None)
 
     metadata = readmeta.computeloss_meta(con, exposureid)
     exposure = readvector.prepareExposureForLoss(con, exposureid)
-    base = float(metadata["base"])
+    base = float(metadata["base"]) or 0
     threshold = float(metadata["threshold"])
     stepsize = float(metadata["stepsize"])
     haztype = metadata["hazintensity"]
@@ -88,38 +89,52 @@ def ComputeLoss(con, exposureid, lossid, computecol='Cost', **kwargs):
     schema = metadata["Schema"]
     spprob = metadata["spprob"]
     spprob_single = metadata["spprob_single"]
-    exposure = getHazardMeanIntensity(exposure, stepsize, base,threshold)
+    exposure = getHazardMeanIntensity(exposure, stepsize, base, threshold)
     exposure = estimatevulnerability(exposure, haztype, vulnColumn, con)
-    if computecol=='Cost':
+    if computecol == 'Cost':
         costColumn = metadata["costColumn"]
-    elif computecol=='Population' :
+    elif computecol == 'Population':
         costColumn = metadata["populColumn"]
-    elif computecol=='Geometry':
-        costColumn='areaOrLen'
-    else :
-        exposure['counts']=1
-        costColumn='counts'
+    elif computecol == 'Geometry':
+        costColumn = 'areaOrLen'
+    else:
+        exposure['counts'] = 1
+        costColumn = 'counts'
     if spprob == None:
         loss = calculateLoss(exposure, costColumn)
     elif spprob_single:
         loss = calculateLoss(exposure, costColumn, spprob)
     else:
         loss = calculateLoss(exposure, costColumn, spprob)
-    loss['loss_id'] = lossid
-    if not onlyaggregated:
-        writevector.writeLoss(loss, con, schema)
 
     if is_aggregated:
         admin_unit = readvector.readAdmin(con, adminid)
+        admin_unit = gpd.GeoDataFrame(admin_unit, geometry="geom")
         earid = metadata["earID"]
         earpk = metadata['earPK']
         adminmeta = readmeta.getAdminMeta(con, adminid)
-        adminpk = adminmeta.data_id[0]
+        adminpk = adminmeta.col_admin[0] or adminmeta.data_id[0]
+        admin_dataid = adminmeta.data_id[0]
         ear = readvector.readear(con, earid)
         loss = pd.merge(left=loss, right=ear[[
                         earpk, 'geom']], left_on='geom_id', right_on=earpk, right_index=False)
         loss = gpd.GeoDataFrame(loss, geometry='geom')
-        loss = aggregator.aggregateloss(loss, admin_unit, adminpk)
+
+        # check whether adminpk and ear columns have same name, issue #80
+        df_columns = list(loss.columns)
+        if adminpk in df_columns:
+            loss = loss.rename(columns={adminpk: f"{adminpk}_ear"})
+
+        loss = aggregator.aggregateloss(
+            loss, admin_unit, adminpk, admin_dataid)
+        loss = loss.rename(
+            columns={adminpk: 'admin_id', admin_dataid: "geom_id"})
         assert not loss.empty, f"The aggregated dataframe in loss returned empty"
-        loss['loss_id'] = lossid
-        writevector.writeLossAgg(loss, con, schema)
+
+    # Non aggrigated case
+    else:
+        loss['admin_id'] = ''
+
+    # common tasks for both results
+    loss['loss_id'] = lossid
+    writevector.writeLoss(loss, con, schema)
