@@ -1,22 +1,31 @@
-from distutils.core import setup
+from setuptools import setup
+import os
+
+here = os.path.abspath(os.path.dirname(__file__))
+
+about = dict()
+with open(os.path.join(here, 'RiskChanges', "__version__.py"), "r") as f:
+    exec(f.read(), about)
+
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(
-    name='RiskChanges',         # How you named your package folder (MyLib)
+    name='RiskChanges',
     packages=['RiskChanges', "RiskChanges.DataManage",
-              "RiskChanges.RiskChangesOps"],   # Chose the same as "name"
-    version='2.1.0',      # Start with a small number and increase it with every change you make
+              "RiskChanges.RiskChangesOps"],
+    version=about["__version__"],
     # Chose a license from here: https://help.github.com/articles/licensing-a-repository
     license='cc-by-4.0',
-    # Give a short description about your library
     description='Library for computation of Loss and risk for Changing Natural Hazards',
-    author='Ashok Dahal ',                   # Type in your name
-    author_email='ashokdahal.geo@gmail.com',      # Type in your E-Mail
-    # Provide either the link to your github or to your website
-    url='https://github.com/ashokdahal',
-    # I explain this later on
-    download_url='https://github.com/ashokdahal/RiskChanges/archive/refs/tags/v2.zip',
-    # Keywords that define your package best
-    keywords=['Risk', 'Natural Hazard', 'Loss'],
-    install_requires=[            # I get to this in a second
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    author=about["__author__"],
+    author_email=about["__email__"],
+    url='https://github.com/RiskChanges/RiskChanges',
+    keywords=['Risk', 'Natural Hazard', 'Loss', "RiskChanges",
+              "SDSS", "Spatial Disaster Support System"],
+    install_requires=[
         'gdal',
         'rasterio',
         'numpy',
