@@ -46,10 +46,10 @@ def ClassifyHazard(hazard_file, base, stepsize, threshold):
 
 def readhaz(connstr, hazid, haz_file):
     hazard_metadata = readmeta.hazmeta(connstr, hazid)
-    base = hazard_metadata.base_val[0]
-    step_size = hazard_metadata.interval_val[0]
+    base = hazard_metadata.base_val[0] or 0
+    step_size = hazard_metadata.interval_val[0] or 1
     hazfile = hazard_metadata.file[0]
-    threshold = hazard_metadata.threshold_val[0]
+    threshold = hazard_metadata.threshold_val[0] or hazard_metadata.raster_max_value[0]
     intensity_type = hazard_metadata.intensity[0]
     if haz_file:
         hazfile = haz_file
