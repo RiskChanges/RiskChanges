@@ -32,11 +32,11 @@ def aggregateloss(loss, adminunit, adminpk, admin_dataid):
     return df_aggregated
 
 
-def aggregaterisk(risk, adminunit, adminpk):
+def aggregaterisk(risk, adminunit, adminpk, admin_dataid):
     overlaid_Data = gpd.overlay(
-        risk, adminunit[[adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
+        risk, adminunit[[adminpk, admin_dataid, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
     # ADMIN_ID
     df_aggregated = overlaid_Data.groupby(
-        [adminpk], as_index=False).agg({'AAL': 'sum'})
+        [adminpk, admin_dataid], as_index=False).agg({'AAL': 'sum'})
     # df_aggregated = pd.DataFrame(df_aggregated.drop(columns='geom'))
     return df_aggregated
