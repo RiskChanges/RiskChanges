@@ -1,3 +1,5 @@
+import random
+import string
 from sklearn.metrics import auc
 import geopandas as gpd
 import pandas as pd
@@ -7,9 +9,9 @@ from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as 
 
 def dutch_method(xx, yy):
     # compute risk based on dutch method where xx is value axis and yy is probability axis
-    args=np.argsort(xx)
-    xx=[xx[i] for i in args]
-    yy=[yy[i] for i in args]
+    args = np.argsort(xx)
+    xx = [xx[i] for i in args]
+    yy = [yy[i] for i in args]
     AAL = auc(yy, xx)+(xx[0]*yy[0])
     return AAL
 
@@ -23,6 +25,10 @@ def checkUniqueHazard(connstr, lossids):
     ) == 1, "Only multiple return periods of single hazard is supported"
 
 
+def id_generator(size=4, chars=string.ascii_lowercase + string.digits):
+    return ''.join(random.choice(chars) for _ in range(size))
+
+
 def PrepareLossForRisk(con, lossids):
     i = True
     cols = []
@@ -30,28 +36,27 @@ def PrepareLossForRisk(con, lossids):
     for id in lossids:
         lossdata = readvector.readLoss(con, id)
         return_period = float(readmeta.getReturnPeriod(con, id))
-        colname = 'loss_rp_'+str(return_period)
+        colname = 'loss_rp_'+id_generator() + "_" + str(return_period)
         cols.append(colname)
         probs.append(1.0/return_period)
-        lossdata = lossdata.rename(
-            columns={'loss': colname, 'geom_id': 'Unit_ID'})
+        lossdata = lossdata.rename(columns={'loss': colname})
         if i:
             prepared_loss = lossdata
             i = False
         else:
-            prepared_loss = prepared_loss.merge(lossdata, on='Unit_ID')
+            prepared_loss = prepared_loss.merge(lossdata, on='geom_id')
     return prepared_loss, cols, probs
 
 
 def calculateRisk(lossdf, columns, probs):
-    risktable = pd.DataFrame(columns=['Unit_ID', 'AAL'])
+    risktable = pd.DataFrame(columns=['geom_id', 'AAL'])
     for index, row in lossdf.iterrows():
         xx = row[columns].values.tolist()
         yy = probs
         aal = dutch_method(xx, yy)
         # print('ear',aal)
-        ear_id = row['Unit_ID']
-        new_row = {'Unit_ID': ear_id, 'AAL': aal}
+        ear_id = row['geom_id']
+        new_row = {'geom_id': ear_id, 'AAL': aal}
         # append row to the dataframe
         risktable = risktable.append(new_row, ignore_index=True)
     assert not risktable.empty, f"The Risk calculation failed"
@@ -68,22 +73,37 @@ def ComputeRisk(con, lossids, riskid, **kwargs):
     risk = calculateRisk(lossdf, columns, probs)
     metatable = readmeta.readLossMeta(con, lossids[0])
     schema = metatable.workspace[0]
-    risk['risk_id'] = riskid
 
-    if not onlyaggregated:
-        writevector.writeRisk(risk, con, schema)
     if is_aggregated:
         admin_unit = readvector.readAdmin(con, adminid)
+        admin_unit = gpd.GeoDataFrame(admin_unit, geometry="geom")
         ear_id = metatable['ear_index_id'][0]
         earmeta = readmeta.earmeta(con, ear_id)
         earPK = earmeta.data_id[0]
         ear = readvector.readear(con, ear_id)
         adminmeta = readmeta.getAdminMeta(con, adminid)
-        adminpk = adminmeta.data_id[0]
+        admin_dataid = adminmeta.data_id[0]
+        adminpk = adminmeta.col_admin[0] or adminmeta.data_id[0]
         risk = pd.merge(left=risk, right=ear[[earPK, 'geom']],
-                        left_on='Unit_ID', right_on=earPK, right_index=False)
+                        left_on='geom_id', right_on=earPK, right_index=False)
         risk = gpd.GeoDataFrame(risk, geometry='geom')
-        risk = aggregator.aggregaterisk(risk, admin_unit, adminpk)
+
+        # check whether adminpk and ear columns have same name, issue #80
+        df_columns = list(risk.columns)
+        if adminpk in df_columns:
+            risk = risk.rename(columns={adminpk: f"{adminpk}_ear"})
+
+        # aggrigate result
+        risk = aggregator.aggregaterisk(
+            risk, admin_unit, adminpk, admin_dataid)
+        risk = risk.rename(
+            columns={adminpk: 'admin_id', admin_dataid: "geom_id"})
         assert not risk.empty, f"The aggregated dataframe in risk returned empty"
-        risk['risk_id']=riskid
-        writevector.writeRiskAgg(risk, con, schema)
+
+    # Non aggrigate case
+    else:
+        risk['admin_id'] = ''
+
+    # common tasks for both results
+    risk['risk_id'] = riskid
+    writevector.writeRisk(risk, con, schema)
