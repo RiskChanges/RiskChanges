@@ -1,3 +1,5 @@
+import random
+import string
 from sklearn.metrics import auc
 import geopandas as gpd
 import pandas as pd
@@ -23,6 +25,10 @@ def checkUniqueHazard(connstr, lossids):
     ) == 1, "Only multiple return periods of single hazard is supported"
 
 
+def id_generator(size=4, chars=string.ascii_lowercase + string.digits):
+    return ''.join(random.choice(chars) for _ in range(size))
+
+
 def PrepareLossForRisk(con, lossids):
     i = True
     cols = []
@@ -30,7 +36,7 @@ def PrepareLossForRisk(con, lossids):
     for id in lossids:
         lossdata = readvector.readLoss(con, id)
         return_period = float(readmeta.getReturnPeriod(con, id))
-        colname = 'loss_rp_'+str(return_period)
+        colname = 'loss_rp_'+id_generator() + "_" + str(return_period)
         cols.append(colname)
         probs.append(1.0/return_period)
         lossdata = lossdata.rename(columns={'loss': colname})
