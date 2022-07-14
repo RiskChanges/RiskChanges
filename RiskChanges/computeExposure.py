@@ -9,9 +9,16 @@ from .RiskChangesOps.readvector import readear, readAdmin
 from .RiskChangesOps import readmeta
 
 
-def polygonExposure(ear, haz, expid, Ear_Table_PK):
+def polygonExposure(ear, haz, expid, Ear_Table_PK, progress_recorder):
     df = pd.DataFrame()
     for ind, row in ear.iterrows():
+        try:
+            print(ind, progress_recorder, 'index from polygon exposure')
+            progress_recorder.set_progress(ind + 1, len(ear.index))
+
+        except:
+            print('progress_recorder not working!')
+            pass
         # print(row)
         # rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
         try:
@@ -141,6 +148,8 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     onlyaggregated = kwargs.get('only_aggregated', True)
     adminid = kwargs.get('adminunit_id', None)
     haz_file = kwargs.get('haz_file', None)
+    progress_recorder = kwargs.get('progress_recorder', None)
+    print(progress_recorder, 'progress_recorder is here ')
 
     ear = readear(con, earid)
     haz = readhaz(con, hazid, haz_file)
@@ -187,7 +196,8 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
             ear['geom'] = ear['geom'].centroid
             df = pointExposure(ear, haz, expid, Ear_Table_PK)
         else:
-            df = polygonExposure(ear, haz, expid, Ear_Table_PK)
+            df = polygonExposure(ear, haz, expid, Ear_Table_PK,
+                                 progress_recorder=progress_recorder)
     # point exposure
     elif(geometrytype == 'Point' or geometrytype == 'MultiPoint'):
         df = pointExposure(ear, haz, expid, Ear_Table_PK)
