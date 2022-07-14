@@ -12,12 +12,12 @@ from .RiskChangesOps import readmeta
 def polygonExposure(ear, haz, expid, Ear_Table_PK, progress_recorder):
     df = pd.DataFrame()
     for ind, row in ear.iterrows():
+
+        # to implement the progress bar in task 
         try:
-            print(ind, progress_recorder, 'index from polygon exposure')
             progress_recorder.set_progress(ind + 1, len(ear.index))
 
         except:
-            print('progress_recorder not working!')
             pass
         # print(row)
         # rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
@@ -66,13 +66,21 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK, progress_recorder):
     return df
 
 
-def lineExposure(ear, haz, expid, Ear_Table_PK):
+def lineExposure(ear, haz, expid, Ear_Table_PK, progress_recorder):
 
     gt = haz.transform
     buffersize = gt[0]/4
     df = pd.DataFrame()
     # print(buffersize)
     for ind, row in ear.iterrows():
+
+        # progress bar for celery 
+        try:
+            progress_recorder.set_progress(ind + 1, len(ear.index))
+
+        except:
+            pass
+
         polygon = row.geom.buffer(buffersize)
         # rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
         try:
@@ -119,7 +127,7 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
     return df
 
 
-def pointExposure(ear, haz, expid, Ear_Table_PK):
+def pointExposure(ear, haz, expid, Ear_Table_PK, progress_recorder):
     coords = [(x, y) for x, y in zip(ear.geometry.x, ear.geometry.y)]
     df_temp = pd.DataFrame()
     classes = []
@@ -149,7 +157,6 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     adminid = kwargs.get('adminunit_id', None)
     haz_file = kwargs.get('haz_file', None)
     progress_recorder = kwargs.get('progress_recorder', None)
-    print(progress_recorder, 'progress_recorder is here ')
 
     ear = readear(con, earid)
     haz = readhaz(con, hazid, haz_file)
@@ -194,17 +201,17 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         mean_area = ear.areacheck.mean()
         if mean_area <= 0:
             ear['geom'] = ear['geom'].centroid
-            df = pointExposure(ear, haz, expid, Ear_Table_PK)
+            df = pointExposure(ear, haz, expid, Ear_Table_PK, progress_recorder=progress_recorder)
         else:
             df = polygonExposure(ear, haz, expid, Ear_Table_PK,
                                  progress_recorder=progress_recorder)
     # point exposure
     elif(geometrytype == 'Point' or geometrytype == 'MultiPoint'):
-        df = pointExposure(ear, haz, expid, Ear_Table_PK)
+        df = pointExposure(ear, haz, expid, Ear_Table_PK, progress_recorder=progress_recorder)
 
     # line exposure
     elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
-        df = lineExposure(ear, haz, expid, Ear_Table_PK)
+        df = lineExposure(ear, haz, expid, Ear_Table_PK, progress_recorder=progress_recorder)
     haz = None
 
     df = pd.merge(left=df, right=ear, left_on='geom_id',
