@@ -33,7 +33,7 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         # so try except to pass even the class is not available
         try:
             name = name['class_name'].to_list()[0]
-            convert_dict[i] = name
+            convert_dict[i+1] = name
 
         except:
             pass
@@ -94,7 +94,7 @@ def getShapefile(con, exposureid, column='exposed', agg=False):
         # so try except to pass even the class is not available
         try:
             name = name['class_name'].to_list()[0]
-            convert_dict[i] = name
+            convert_dict[i+1] = name
 
         except:
             pass
@@ -168,7 +168,7 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
         # so try except to pass even the class is not available
         try:
             name = name['class_name'].to_list()[0]
-            convert_dict[i] = name
+            convert_dict[i+1] = name
 
         except:
             pass
@@ -250,7 +250,7 @@ def getShapefileRel(con, exposureid, column='exposed', agg=False):
         # so try except to pass even the class is not available
         try:
             name = name['class_name'].to_list()[0]
-            convert_dict[i] = name
+            convert_dict[i+1] = name
 
         except:
             pass
