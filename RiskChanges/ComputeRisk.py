@@ -12,7 +12,7 @@ def dutch_method(xx, yy):
     args = np.argsort(xx)
     xx = [xx[i] for i in args]
     yy = [yy[i] for i in args]
-    AAL = auc(yy, xx)+(xx[0]*yy[0])
+    AAL = auc(x=xx, y=yy)+(xx[0]*yy[0])
     return AAL
 
 
