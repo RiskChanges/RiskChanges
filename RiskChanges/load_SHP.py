@@ -15,4 +15,4 @@ def loadshp(shpInput, engine, lyrName, schema, index):
     gdf.to_postgis(name=lyrName, con=engine,
                             schema=schema, if_exists='replace')
 
-    engine.dispose()
+    # engine.dispose()
