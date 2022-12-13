@@ -7,7 +7,10 @@ from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as 
 
 def dutch_method(xx, yy):
     # compute risk based on dutch method where xx is value axis and yy is probability axis
-    AAL = auc(yy, xx)+(xx[0]*yy[0])
+    args = np.argsort(np.array(xx,dtype=np.float32))
+    xx = [xx[i] for i in args]
+    yy = [yy[i] for i in args]
+    AAL = auc(x=xx, y=yy)+(xx[0]*yy[0])
     return AAL
 
 
