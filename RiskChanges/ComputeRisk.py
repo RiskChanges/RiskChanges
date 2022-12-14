@@ -44,7 +44,8 @@ def PrepareLossForRisk(con, lossids):
             prepared_loss = lossdata
             i = False
         else:
-            prepared_loss = prepared_loss.merge(lossdata, on='geom_id')
+            prepared_loss = prepared_loss.merge(lossdata, on='geom_id',how='outer')
+    prepared_loss[cols]=prepared_loss[cols].fillna(value=0)
     return prepared_loss, cols, probs
 
 
