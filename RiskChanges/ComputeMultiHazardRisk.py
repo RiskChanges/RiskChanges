@@ -24,6 +24,7 @@ def checkUniqueHazard(con, lossids):
 
 
 def predict_loss(prepared_loss, rps, probs, extensions, hazard):
+    # print(probs,"probs")
     #Lmin_x = extensions['left'][0][0]
     #Lmin_y = extensions['left'][0][1]
     #Rmin_x = extensions['right'][0][0]
@@ -40,22 +41,31 @@ def predict_loss(prepared_loss, rps, probs, extensions, hazard):
     return_periods = np.around(return_periods, decimals=-1).tolist()
     return_periods[0] = min_rp
     return_periods[-1] = max_rp
-    low_rp = 'loss_rp_'+str(rps.min())
-    high_rp = 'loss_rp_'+str(rps.max())
+    # low_rp = 'loss_rp_'+str(rps.min())
+    # high_rp = 'loss_rp_'+str(rps.max())
+    low_rp = 'loss_rp_'+str(min(rps))
+    high_rp = 'loss_rp_'+str(max(rps))
     colname_min = 'loss_rp_'+str(min_rp)
     colname_max = 'loss_rp_'+str(max_rp)
-    left_dx = abs(probs.min()-min_rp)
-    right_dx = abs(probs.max()-min_rp)
+    left_dx = abs(min(probs)-min_rp)
+    right_dx = abs(max(probs)-min_rp)
+    # left_dx = abs(probs.min()-min_rp)
+    # right_dx = abs(probs.max()-min_rp)
     # negative because extending in left //negative slope
     prepared_loss[colname_max] = prepared_loss.apply(
         lambda row: row[high_rp]+left_dx*m_left, axis=1)
     prepared_loss[colname_min] = prepared_loss.apply(
         lambda row: row[low_rp]-right_dx*m_right, axis=1)  # negative because extending in right
     # perform interpolation for loss values using following methods
-    rps = rps.sort(reverse=True)
-    probs = probs.sort()
-    probs.insert(0, Lmin_x)
-    probs.insert(-1, Rmax_x)
+    # rps = rps.sort(reverse=True)
+    rps.sort(reverse=True)
+    # probs = li=probs.sort()
+    probs.sort()
+    # probs.insert(0, Lmin_x)  ##verify Lmin_x not defined
+    # probs.insert(-1, Rmax_x) ##verify
+    probs.insert(0, m_left)  ##verify
+    probs.insert(-1, m_right) ##verify
+    print(probs,"mmmmmmmmmmmmmmmmmmmmmmmmm")
     interp_cols = ['loss_rp_'+str(x) for x in rps]
     interp_cols.insert(-1, colname_min)
     interp_cols.insert(0, colname_max)
@@ -66,10 +76,14 @@ def predict_loss(prepared_loss, rps, probs, extensions, hazard):
     new_cols.append('Unit_ID')
     new_losses = []
     for index, row in prepared_loss.iterrows():
-        y = row[interp_cols].values
+        # y = row[interp_cols].values
+        y = (row[interp_cols].values).tolist()
         x = interp_probs
-        loss = np.interp(predict_probs, x, y, left=y.max(),
-                         right=y.min()).tolist()
+        
+        loss = np.interp(predict_probs, x, y, left=max(y),
+                         right=min(y)).tolist()
+        # loss = np.interp(predict_probs, x, y, left=y.max(),
+        #                  right=y.min()).tolist()
         loss.append(row.Unit_ID)
         new_losses.append(loss)
     prepared_loss = pd.DataFrame(new_losses, columns=new_cols)
@@ -79,7 +93,8 @@ def predict_loss(prepared_loss, rps, probs, extensions, hazard):
 def getMaxcost(con, lossid):
     meta = readmeta.readLossMeta(con, lossid)
     ear_id = meta['ear_index_id'][0]
-    earmeta = readmeta.exposuremeta(con, ear_id)
+    earmeta = readmeta.earmeta(con, ear_id)
+    # earmeta = readmeta.exposuremeta(con, ear_id)
     earPK = earmeta.data_id[0]
     cost_column = meta['ear_cost_column'][0]
     cost_data = readvector.readear(con, ear_id)
@@ -93,6 +108,7 @@ def PrepareLossForRisk(con, lossids, extensions, hazard):
     for id in lossids:
         lossdata = readvector.readLoss(con, id)
         return_period = float(readmeta.getReturnPeriod(con, id))
+        
         colname = 'loss_rp_'+str(return_period)
         rps.append(return_period)
         probs.append(1.0/return_period)
@@ -247,16 +263,24 @@ def calculateRisk(lossdf, columns, probs):
 #
 
 def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
+    print(groupcombinations,"groupcombinations")
+    print(extensions,"extensions")
+    print(riskid,"riskid")
     is_aggregated = kwargs.get('is_aggregated', False)
     onlyaggregated = kwargs.get('only_aggregated', False)
     adminid = kwargs.get('adminunit_id', None)
 
     first_risk = True
     for group in groupcombinations:
-        losscombinations = groupcombinations[group]['lossid']
-        hazardinteractions = groupcombinations[group]['interactions']
-        hazards = groupcombinations[group]['hazards']
-        weights = groupcombinations[group]['weights']
+        # losscombinations = groupcombinations[group]['lossid']
+        # hazardinteractions = groupcombinations[group]['interactions']
+        # hazards = groupcombinations[group]['hazards']
+        # weights = groupcombinations[group]['weights']
+        losscombinations = group['lossIds']
+        hazardinteractions = group['interaction']
+        hazards = group['hazardType']
+        if 'weight' in group.keys():
+            weights = group['weight']
         loss_normalization = {}
         first = True
 
