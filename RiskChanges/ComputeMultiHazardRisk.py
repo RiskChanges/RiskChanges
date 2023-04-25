@@ -73,7 +73,6 @@ def predict_loss(prepared_loss, rps, probs, extensions, hazard):
     new_cols = [hazard+'_lrp_'+str(int(x)) for x in return_periods]
     new_cols.append('Unit_ID')
     new_losses = []
-    # print(prepared_loss.columns,"columnsssssssssssssssssssssss")
     for index, row in prepared_loss.iterrows():
         # y = row[interp_cols].values
         y = (row[interp_cols].values).tolist()
@@ -86,12 +85,12 @@ def predict_loss(prepared_loss, rps, probs, extensions, hazard):
         loss.append(row.Unit_ID)
         new_losses.append(loss)
     prepared_loss = pd.DataFrame(new_losses, columns=new_cols)
+    # print(prepared_loss['Unit_ID'],"PREPARE LOSS IDS")
     return prepared_loss, new_cols[:-1], predict_probs
 
 
 def getMaxcost(con, lossid):
     meta = readmeta.readLossMeta(con, lossid)
-    # print(meta.columns,"metaaaaaaaaaa")
     ear_id = meta['ear_index_id'][0]
     earmeta = readmeta.earmeta(con, ear_id)
     earPK = earmeta.data_id[0]
@@ -101,6 +100,7 @@ def getMaxcost(con, lossid):
 
 
 def PrepareLossForRisk(con, lossids, extensions, hazard):
+    # print("PrepareLossForRisk called")
     i = True
     rps = []
     probs = []
@@ -111,6 +111,7 @@ def PrepareLossForRisk(con, lossids, extensions, hazard):
         lossids_list=lossids
         
     for id in lossids_list:
+        # print(id,"loss id")
         lossdata = readvector.readLoss(con, id)
         return_period = float(readmeta.getReturnPeriod(con, id))
         
@@ -124,16 +125,21 @@ def PrepareLossForRisk(con, lossids, extensions, hazard):
             i = False
         else:
             prepared_loss = prepared_loss.merge(lossdata, on='Unit_ID')
-            
-            
-            
-            
+                
     modified_loss, cols, probs = predict_loss(
         prepared_loss, rps, probs, extensions, hazard)
     cost_data, cost_col, earPK = getMaxcost(con, lossids_list[0])
-    prepared_loss = pd.merge(left=modified_loss, right=cost_data[[earPK, cost_col]], how='outer', left_on=[
-                             'Unit_ID'], right_on=[earPK], right_index=False).rename(columns={cost_col: 'MAX_COST'})
-    
+    # print(modified_loss['Unit_ID'],"modified_loss UNIT ID **")
+    # print(cost_data[earPK],"COST DATA EAR PK **")
+    prepared_loss = pd.merge(left=modified_loss, right=cost_data[[earPK, cost_col]], how='inner', left_on=[
+                             'Unit_ID'], right_on=[earPK], right_index=False) #.rename(columns={cost_col: 'MAX_COST'})
+
+    # prepared_loss = pd.merge(left=modified_loss, right=cost_data[[earPK, cost_col]], how='outer', left_on=[
+    #                          'Unit_ID'], right_on=[earPK], right_index=False) #.rename(columns={cost_col: 'MAX_COST'})
+    if 'MAX_COST' in prepared_loss.columns:
+        prepared_loss= prepared_loss.drop(columns=['MAX_COST']) 
+    prepared_loss=prepared_loss.rename(columns={cost_col: 'MAX_COST'})
+    # print(prepared_loss[['Unit_ID',earPK]],"prepared_loss RETURN FROM FUNCTION")
     return prepared_loss, cols, probs
 
 
@@ -171,11 +177,13 @@ def combineLosses(lossess, interacting_hazards, interaction='independent', haz_p
                 loss = loss.drop(columns=['MAX_COST']) 
             all_loss = pd.merge(left=all_loss, right=loss, how='outer', left_on=[
                                 'Unit_ID'], right_on=['Unit_ID'], right_index=False)
+        # print(all_loss['Unit_ID'],"UNIT ID AFTER MERGE")
 
     first_data = True
     # max_cost obtain from database
     cols = [w.replace(haz, '') for w in lossess[haz]['cols']]
     new_columns = []
+
 
     for col in cols:
         colm = [haz1+col for haz1 in hazlist]
@@ -190,6 +198,7 @@ def combineLosses(lossess, interacting_hazards, interaction='independent', haz_p
         else:
             combined_loss = pd.merge(left=combined_loss, right=combined_loss_step, how='outer', left_on=[
                                      'Unit_ID'], right_on=['Unit_ID'], right_index=False)
+            
     return combined_loss
 
 
@@ -218,6 +227,7 @@ def mul_coupled(loss_data, colm):
 
 
 def mul_cascading(loss_data, colm):
+    # print("mul_cascading function called")
     loss_data['combined_nf'] = loss_data[colm].sum(axis=1)
     loss_data['combined'] = loss_data[['combined_nf', 'MAX_COST']].min(axis=1)
     cascading_loss = loss_data[['Unit_ID', 'combined']]
@@ -275,7 +285,7 @@ def calculateRisk(lossdf, columns, probs):
 
 def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
     is_aggregated = kwargs.get('is_aggregated', False)
-    onlyaggregated = kwargs.get('only_aggregated', False)
+    # onlyaggregated = kwargs.get('only_aggregated', False)
     adminid = kwargs.get('adminunit_id', None)
 
     first_risk = True
@@ -287,6 +297,7 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
         # weights = groupcombinations[group]['weights']
         
         losscombinations = group['lossIds']
+        print(losscombinations,"losscombinationslosscombinations")
         hazardinteraction = group['interaction']
         hazardinteractions = []
         if isinstance(hazardinteraction, str):
@@ -329,6 +340,7 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
             if len(hazardinteractions) == 0:
                 continue
             elif len(hazardinteractions) == 1:
+                print("hazard interaction length 1")
                 if haz_prob != None:
                     haz_prob_arg = haz_prob[0]
                 else:
@@ -336,6 +348,8 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
                 combined_loss = combineLosses(
                     loss_normalization, interacting_hazards, interaction, haz_prob_arg)
             else:
+                print("hazard interaction length greater than 1")
+                
                 second = True
                 for single_interaction in interacting_hazards:
                     index_nm = interacting_hazards.index(single_interaction)
@@ -346,14 +360,19 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
                     combined_loss_step = combineLosses(
                         loss_normalization, single_interaction, interaction, haz_prob_arg)
                     if second:
+                        print("secondddd")
                         combined_loss = combined_loss_step
                         second = False
                     else:
+                        
                         cols = combined_loss_step.columns.tolist()
                         cols_selected = [
                             word for word in cols if ('combined' in word)]
+                        print(combined_loss['Unit_ID'],"compute mul risk combined loss")
+                        print(combined_loss_step['Unit_ID'],"compute mul risk combined loss step")
                         merged = pd.merge(left=combined_loss, right=combined_loss_step, how='outer', left_on=[
                                           'Unit_ID'], right_on=['Unit_ID'], right_index=False, suffixes=('_left', '_right'))
+                        print(merged['Unit_ID'],"MERGED UNIT ID")
                         del combined_loss, combined_loss_step
                         merged_cols = merged.columns.tolist()
                         for col in cols_selected:
@@ -369,6 +388,8 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
             else:
                 cols = combined_loss.columns.values.tolist()
                 cols_selected = [word for word in cols if ('combined' in word)]
+                print(combined_loss['Unit_ID'],"compute mul risk combined loss 2")
+                print(final_loss['Unit_ID'],"compute mul risk final loss 2")
                 merged = pd.merge(left=final_loss, right=combined_loss, how='outer', left_on=[
                                   'Unit_ID'], right_on=['Unit_ID'], right_index=False, suffixes=('_left', '_right'))
                 del final_loss, combined_loss
@@ -397,25 +418,40 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
             combined_df = combined_df.drop(["AAL_total", "AAL"], axis=1)
             del totalrisk
             totalrisk = combined_df.rename(columns={"AAL_sum": "AAL_total"})
-    risk = totalrisk.rename(columns={"AAL_total": "AAL","Unit_ID": "geom_id"})
+    risk = totalrisk.rename(columns={"AAL_total": "AAL"})
+    # risk = totalrisk.rename(columns={"AAL_total": "AAL","Unit_ID": "geom_id"})
     metatable = readmeta.readLossMeta(connstr, lossids[0])
     schema = metatable.workspace[0]
-    risk['risk_id'] = riskid
+    # risk['risk_id'] = riskid
 
-    if not onlyaggregated:
-        writevector.writeRisk(risk, connstr, schema)
+    # if not onlyaggregated:
+    #     writevector.writeRisk(risk, connstr, schema)
     if is_aggregated:
         admin_unit = readvector.readAdmin(connstr, adminid)
+        admin_unit = gpd.GeoDataFrame(admin_unit, geometry="geom")
         ear_id = metatable['ear_index_id'][0]
         ear = readvector.readear(connstr, ear_id)
-        earmeta = readmeta.exposuremeta(connstr, ear_id)
+        earmeta = readmeta.earmeta(connstr, ear_id)
         earPK = earmeta.data_id[0]
         adminmeta = readmeta.getAdminMeta(connstr, adminid)
-        adminpk = adminmeta.data_id[0]
-        risk = pd.merge(left=risk, right=ear[earPK, 'geom'],
+        admin_dataid = adminmeta.data_id[0]
+        # adminpk = adminmeta.data_id[0] 
+        adminpk = adminmeta.col_admin[0] or adminmeta.data_id[0]
+        risk = pd.merge(left=risk, right=ear[[earPK, 'geom']],
                         left_on='Unit_ID', right_on=earPK, right_index=False)
         risk = gpd.GeoDataFrame(risk, geometry='geom')
-        risk = aggregator.aggregaterisk(risk, admin_unit, adminpk)
+        df_columns = list(risk.columns)
+        if adminpk in df_columns:
+            risk = risk.rename(columns={adminpk: f"{adminpk}_ear"})
+        risk = aggregator.aggregaterisk(risk, admin_unit, adminpk,admin_dataid)
+        risk = risk.rename(
+            columns={adminpk: 'admin_id', admin_dataid: "geom_id"})
+        # risk = risk.rename(
+        #     columns={adminpk: 'admin_id', admin_dataid: "geom_id"})
         assert not risk.empty, f"The aggregated dataframe in risk returned empty"
-        risk['risk_id'] = riskid
-        writevector.writeRiskAgg(risk, connstr, schema)
+    else:
+        risk['admin_id'] = ''
+        risk = risk.rename(columns={"Unit_ID": "geom_id"})
+    risk['risk_id'] = riskid
+    writevector.writeRisk(risk, connstr, schema)
+    # writevector.writeRiskAgg(risk, connstr, schema)

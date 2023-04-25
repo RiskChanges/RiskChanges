@@ -54,13 +54,15 @@ def estimatevulnerability(exposuretable, haztype, vulnColumn, con):
 
 
 def calculateLoss(exposuretable, costColumn, spprob=1):
-    exposuretable['loss'] = exposuretable.apply(
-        lambda row: row[costColumn]*row.exposed*row.vuln*spprob/100, axis=1)
-    losstable = exposuretable.groupby(
-        ["geom_id"], as_index=False).agg({'loss': 'sum'})
-    losstable_lossonly = losstable[["loss", "geom_id"]]
-    return losstable_lossonly
-
+    try:
+        exposuretable['loss'] = exposuretable.apply(
+            lambda row: row[costColumn]*row.exposed*row.vuln*spprob/100, axis=1)
+        losstable = exposuretable.groupby(
+            ["geom_id"], as_index=False).agg({'loss': 'sum'})
+        losstable_lossonly = losstable[["loss", "geom_id"]]
+        return losstable_lossonly
+    except Exception as e:
+        raise ValueError(f"Caution: Make sure column: '{costColumn}' is valid for loss calculation; Error Detail: {str(e)}")
 
 def calculateLoss_spprob(exposuretable, costColumn, spprob):
     exposuretable = exposuretable.merge(
