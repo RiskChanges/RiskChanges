@@ -15,22 +15,41 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
         # print(row)
         # rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
         try:
-            maska, transform = rasterops.cropraster(haz, [row.geom])
+            maska, transform,len_ras = rasterops.cropraster(haz, [row.geom])
         except:
+            print("could not cropraster")
             continue
+        
+        '''
+        This code line creates a masked array using the masked_array() function from the numpy.ma module. 
+        The masked_array() function takes two arguments: 
+        the first argument (maska) is the original array or raster, and 
+        The second argument is the mask array, which indicates which elements in the original array should be masked (hidden) from computations
+        The mask is set to maska == 0, which means that all elements in maska with a value of zero (which are likely to be nodata values) will be masked out. This effectively removes nodata values from the computation of any statistics or analyses performed on zoneraster.
+        '''
         zoneraster = ma.masked_array(maska, mask=maska == 0)
-        len_ras = zoneraster.count()
-        # print(len_ras)
+        # print(np.count_nonzero(maska), zoneraster.count())
+        
+        # len_ras = zoneraster.count()
         if len_ras == 0:
+            # print("length of raster zero")
             continue
 
         unique, counts = np.unique(zoneraster, return_counts=True)
+        # print(unique,"uniue")
+        # print(counts,"counts")
+        '''
+        The index of the zero value is identified using the where() function from the numpy module, and that index is used to delete the corresponding elements in both the ids and cus arrays using the delete()
+        '''
         if ma.is_masked(unique):
+            print("ma.is_masked(unique)")
             unique = unique.filled(0)
             idx = np.where(unique == 0)[0][0]
             # print(idx)
             ids = np.delete(unique, idx)
             cus = np.delete(counts, idx)
+            print(ids,"unique as ids")
+            print(cus,"counts as cus")
         else:
             ids = unique
             cus = counts
@@ -39,16 +58,25 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
             ids = np.delete(ids, idx)
             cus = np.delete(cus, idx)
         if len(ids) == 0:
+            # print("len of ids zero")
             # print(len(ids))
             # break
             continue
         elif np.max(ids) == 0:
+            # print("np max ids zero")
             continue
-
+        # print(type(cus),"type cus")
+        # print(type(len_ras),"type len_ras")
+        if int(cus.any()) != int(len_ras):
+            # print(ids,"ids")
+            print(int(cus.any()),"cus")
+            print(len_ras,"len of raster")
+             
         frequencies = np.asarray((ids, cus)).T
+        print(frequencies,"before")
         for i in range(len(frequencies)):
             frequencies[i][1] = (frequencies[i][1]/len_ras)*100
-        # print(frequencies)
+        print(frequencies,"frequencies after")
         df_temp = pd.DataFrame(frequencies, columns=['class', 'exposed'])
         df_temp['geom_id'] = row[Ear_Table_PK]
         df_temp['areaOrLen'] = row.geom.area
@@ -56,6 +84,7 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
         df = df.append(df_temp, ignore_index=True)
 
     haz = None
+    # print(df, "return df")
     return df
 
 
@@ -184,9 +213,11 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         ear['areacheck'] = ear.geom.area
         mean_area = ear.areacheck.mean()
         if mean_area <= 0:
+            print("mean area less than zero")
             ear['geom'] = ear['geom'].centroid
             df = pointExposure(ear, haz, expid, Ear_Table_PK)
         else:
+            print("call to polygon exposure")
             df = polygonExposure(ear, haz, expid, Ear_Table_PK)
     # point exposure
     elif(geometrytype == 'Point' or geometrytype == 'MultiPoint'):
