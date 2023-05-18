@@ -9,7 +9,6 @@ from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as 
 # logger = logging.getLogger(__file__)
 
 def getSummary(con, exposureid, column='areaOrLen', agg=False):
-    # logger.info("getSummary function")
     if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
         raise ValueError(
             "column: status must be one of areaOrLen, value_exposure or population_exposure")
@@ -24,7 +23,6 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
     min_thresholds = np.arange(
         start=base, stop=maxval+1, step=stepsize).tolist()
     convert_dict = {}
-    # logger.info(min_thresholds,"min_thresholdsmin_thresholdsmin_thresholds")
     for i, val in enumerate(min_thresholds):
         # the default type for val1 is char, change it to float and compare
         classificationScheme['val1'] = classificationScheme['val1'].astype(
@@ -37,7 +35,6 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
             convert_dict[i+1] = name
         except:
             pass
-
         # if it is last class, then need to assign max class for all result
         if (val == min_thresholds[-1]):
             exposure['class'] = np.where(
@@ -62,6 +59,9 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         summary = summary.rename(
             columns={type_col: "Ear Class", "admin_id": "Admin Name"})
     summary = summary.fillna(0)
+    #to drop column 0.0 if exists
+    if 0.0 in summary.columns:
+        summary = summary.drop(0.0, axis=1)
     return summary
 
 
@@ -128,14 +128,16 @@ def getShapefile(con, exposureid, column='exposed', agg=False):
         summary = pd.merge(left=summary, right=admin,
                            left_on='admin_id', right_on=adminpk, right_index=False)
         summary = gpd.GeoDataFrame(summary, geometry='geom')
-
+    summary = summary.fillna(0)
+    #to drop column 0.0 if exists
+    if 0.0 in summary.columns:
+        summary = summary.drop(0.0, axis=1)
     return summary
 
    # **********************BELOW FUNCTIONS ARE FOR RELATIVE VALUES, ***************************
 
 
 def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
-    # logger.info("getSummaryRel function")
     if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
         raise ValueError(
             "column: status must be one of areaOrLen, value_exposure or population_exposure")
@@ -209,6 +211,9 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
         summary = summary.rename(
             columns={type_col: "Ear Class", "admin_id": "Admin Name"})
     summary = summary.fillna(0)
+    #to drop column 0.0 if exists
+    if 0.0 in summary.columns:
+        summary = summary.drop(0.0, axis=1)
     return summary
 
 
@@ -289,5 +294,8 @@ def getShapefileRel(con, exposureid, column='exposed', agg=False):
         summary = pd.merge(left=summary, right=admin,
                            left_on='admin_id', right_on=adminpk, right_index=False)
         summary = gpd.GeoDataFrame(summary, geometry='geom')
-
+    summary = summary.fillna(0)
+    #to drop column 0.0 if exists
+    if 0.0 in summary.columns:
+        summary = summary.drop(0.0, axis=1)
     return summary
