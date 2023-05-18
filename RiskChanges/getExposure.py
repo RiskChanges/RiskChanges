@@ -5,9 +5,11 @@ import numpy as np
 from .RiskChangesOps.readvulnerability import readIntVuln, readSusVuln
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
+# import logging
+# logger = logging.getLogger(__file__)
 
 def getSummary(con, exposureid, column='areaOrLen', agg=False):
-
+    # logger.info("getSummary function")
     if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
         raise ValueError(
             "column: status must be one of areaOrLen, value_exposure or population_exposure")
@@ -22,19 +24,17 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
     min_thresholds = np.arange(
         start=base, stop=maxval+1, step=stepsize).tolist()
     convert_dict = {}
+    # logger.info(min_thresholds,"min_thresholdsmin_thresholdsmin_thresholds")
     for i, val in enumerate(min_thresholds):
-
         # the default type for val1 is char, change it to float and compare
         classificationScheme['val1'] = classificationScheme['val1'].astype(
             float)
         name = classificationScheme.query(f'val1 == {val}')
-
         # not every hazard class are avialable on exposure table
         # so try except to pass even the class is not available
         try:
             name = name['class_name'].to_list()[0]
             convert_dict[i+1] = name
-
         except:
             pass
 
@@ -42,10 +42,10 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         if (val == min_thresholds[-1]):
             exposure['class'] = np.where(
                 exposure['class'] >= i, i, exposure['class'])
-
+    
     # Change the classes to the user defined class
     exposure['class'].replace(convert_dict, inplace=True)
-
+    
     # if column is count just count the number of feature exposed
     if column == 'count':
         exposure[column] = 1
@@ -61,6 +61,7 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         summary = summary.reset_index()
         summary = summary.rename(
             columns={type_col: "Ear Class", "admin_id": "Admin Name"})
+    summary = summary.fillna(0)
     return summary
 
 
@@ -134,7 +135,7 @@ def getShapefile(con, exposureid, column='exposed', agg=False):
 
 
 def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
-
+    # logger.info("getSummaryRel function")
     if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
         raise ValueError(
             "column: status must be one of areaOrLen, value_exposure or population_exposure")
@@ -169,7 +170,6 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
         try:
             name = name['class_name'].to_list()[0]
             convert_dict[i+1] = name
-
         except:
             pass
 
@@ -193,7 +193,6 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
                            left_on=type_col, right_on=type_col)
         summary[summary.columns.difference([aggcolumn])] = summary[summary.columns.difference([
             aggcolumn])].div(summary[aggcolumn], axis=0)*100
-
         summary = summary.reset_index()
         summary = summary.rename(columns={type_col: "Ear Class"})
 
@@ -209,6 +208,7 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
         summary = summary.reset_index()
         summary = summary.rename(
             columns={type_col: "Ear Class", "admin_id": "Admin Name"})
+    summary = summary.fillna(0)
     return summary
 
 
