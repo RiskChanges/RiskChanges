@@ -10,7 +10,11 @@ from .RiskChangesOps import readmeta
 
 
 def polygonExposure(ear, haz, expid, Ear_Table_PK):
+    # print(ear,"ear")
+    # print(haz,"haz")
+    # print(expid,"expid")
     # print(Ear_Table_PK,"Ear_Table_PK")
+
     df = pd.DataFrame()
     for ind, row in ear.iterrows():
         # print(row)
@@ -40,10 +44,8 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
         The index of the zero value is identified using the where() function from the numpy module, and that index is used to delete the corresponding elements in both the ids and cus arrays using the delete()
         '''
         if ma.is_masked(unique):
-            # print("ma.is_masked(unique)")
             unique = unique.filled(0)
             idx = np.where(unique == 0)[0][0]
-            # print(idx)
             ids = np.delete(unique, idx)
             cus = np.delete(counts, idx)
         else:
@@ -55,25 +57,24 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
             cus = np.delete(cus, idx)
         if len(ids) == 0:
             print("len of ids zero")
-            # print(len(ids))
-            # break
+            # df_temp = pd.DataFrame(np.asarray(('', 0)), columns=['class', 'exposed'])
+            df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
+            df_temp['geom_id'] = row[Ear_Table_PK]
+            df_temp['areaOrLen'] = row.geom.area
+            df_temp['exposure_id'] = expid
+            df = df.append(df_temp, ignore_index=True)
             continue
         elif np.max(ids) == 0:
             print("np max ids zero")
+            df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
+            df_temp['geom_id'] = row[Ear_Table_PK]
+            df_temp['areaOrLen'] = row.geom.area
+            df_temp['exposure_id'] = expid
+            df = df.append(df_temp, ignore_index=True)
             continue
-        # print(ids,"unique as ids")
-        # print(cus,"counts as cus")
-        # print(type(cus),"type cus")
-        # print(type(len_ras),"type len_ras")
-       
-             
         frequencies = np.asarray((ids, cus)).T
-        # print(frequencies,"before")
         for i in range(len(frequencies)):
             frequencies[i][1] = (frequencies[i][1]/len_ras)*100
-            # if int(frequencies[i][1]) != int(len_ras):
-            #     print(row[Ear_Table_PK],frequencies[i][1],int(len_ras),(frequencies[i][1]/len_ras)*100,"all in one")
-        # print(frequencies,"frequencies after")
         df_temp = pd.DataFrame(frequencies, columns=['class', 'exposed'])
         df_temp['geom_id'] = row[Ear_Table_PK]
         df_temp['areaOrLen'] = row.geom.area
@@ -81,7 +82,6 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
         df = df.append(df_temp, ignore_index=True)
 
     haz = None
-    # print(df, "return df")
     return df
 
 
@@ -120,10 +120,18 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
             ids = np.delete(ids, idx)
             cus = np.delete(cus, idx)
         if len(ids) == 0:
-            # print(len(ids))
-            # break
+            df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
+            df_temp['geom_id'] = row[Ear_Table_PK]
+            df_temp['areaOrLen'] = row.geom.length
+            df_temp['exposure_id'] = expid
+            df = df.append(df_temp, ignore_index=True)
             continue
         elif np.max(ids) == 0:
+            df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
+            df_temp['geom_id'] = row[Ear_Table_PK]
+            df_temp['areaOrLen'] = row.geom.length
+            df_temp['exposure_id'] = expid
+            df = df.append(df_temp, ignore_index=True)
             continue
 
         frequencies = np.asarray((ids, cus)).T
@@ -225,10 +233,9 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
         df = lineExposure(ear, haz, expid, Ear_Table_PK)
     haz = None
-
+    assert not df.empty, f"The aggregated dataframe in exposure returned empty, this error may arise if input shapes do not overlap raster"
     df = pd.merge(left=df, right=ear, left_on='geom_id',
                   right_on=Ear_Table_PK, right_index=False)
-    assert not df.empty, f"The aggregated dataframe in exposure returned empty"
     df = gpd.GeoDataFrame(df, geometry='geom')
     # if not onlyaggregated: #due to change of 24 may 2022, it is redundant now because of else statement in coming condition.
     #     df['exposure_id'] = expid
