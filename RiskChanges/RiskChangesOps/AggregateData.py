@@ -1,6 +1,7 @@
 import geopandas as gpd
 import pandas as pd
-
+import logging
+logger = logging.getLogger(__file__)
 
 # write functions to take exposure, loss and risk + admin unit as input and give combined information as an output
 def aggregateexpoure(exposure, adminunit, adminpk):
@@ -33,8 +34,21 @@ def aggregateloss(loss, adminunit, adminpk, admin_dataid):
 
 
 def aggregaterisk(risk, adminunit, adminpk, admin_dataid):
-    overlaid_Data = gpd.overlay(
-        risk, adminunit[[adminpk, admin_dataid, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
+    geometry_types=risk.geometry.geom_type.unique()
+    geometry_type=''
+    if len(geometry_types) == 1:
+        geometry_type = geometry_types[0]
+    else:
+        print("Multiple geometry types found:", geometry_types)
+    if geometry_type=="Polygon":
+        risk['centroid'] = risk.centroid
+        temp_risk_gdf=gpd.GeoDataFrame(risk, geometry='centroid')
+        overlaid_Data = gpd.overlay(
+            temp_risk_gdf, adminunit[[adminpk, admin_dataid, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
+    else:
+        overlaid_Data = gpd.overlay(
+            risk, adminunit[[adminpk, admin_dataid, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
+        
     # ADMIN_ID
     df_aggregated = overlaid_Data.groupby(
         [adminpk, admin_dataid], as_index=False).agg({'AAL': 'sum'})

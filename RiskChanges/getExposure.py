@@ -33,15 +33,18 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         try:
             name = name['class_name'].to_list()[0]
             convert_dict[i+1] = name
-        except:
+        except Exception as e:
+            print(str(e),"Error in getSummary")
             pass
         # if it is last class, then need to assign max class for all result
         if (val == min_thresholds[-1]):
             exposure['class'] = np.where(
                 exposure['class'] >= i, i, exposure['class'])
-    
+            
+    print(exposure['class'],"before")
     # Change the classes to the user defined class
     exposure['class'].replace(convert_dict, inplace=True)
+    print(exposure['class'],"after")
     
     # if column is count just count the number of feature exposed
     if column == 'count':
