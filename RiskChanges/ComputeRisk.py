@@ -7,11 +7,13 @@ import numpy as np
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
 def find_duplicates(arr):
+    rounded_array_list=[round(num, 6) for num in arr]
     duplicates = []
     indices = {}
-    for i, value in enumerate(arr):
+    for i, value in enumerate(rounded_array_list):
         if value in indices:
-            duplicates.append(value)
+            if value not in duplicates:
+                duplicates.append(value)
             indices[value].append(i)
         else:
             indices[value] = [i]
@@ -20,21 +22,20 @@ def find_duplicates(arr):
 
 def dutch_method(xx, yy):
     # compute risk based on dutch method where xx is value axis and yy is probability axis
+    print(xx,"xxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
     duplicates, indices = find_duplicates(xx)
+    print(duplicates,"duplicates")
+    print(indices,"indices")
     if len(duplicates)>0:
         for key in indices.keys():
             if key!=0 and len(indices[key])>1:
-                increment=0.001
+                increment=0.0001
                 if key!=0 and len(indices[key])>1:
-                    print("duplicates find")
-                    print(xx,"xx before")
                     for i in indices[key]:
                         xx[i]=xx[i]+increment if xx[i]+increment not in xx else xx[i]
-                        increment=increment+0.001
-                    print(xx, "xx after")
-                # xx[indices[key][0]]=xx[indices[key][0]]+0.1
+                        increment=increment+0.0001
                 
-    args = np.argsort(np.array(xx,dtype=np.float32))
+    args = np.argsort(np.array(xx,dtype=np.float64))
     xx = [xx[i] for i in args]
     yy = [yy[i] for i in args]
     AAL = auc(x=xx, y=yy)+(xx[0]*yy[0])
