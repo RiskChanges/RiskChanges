@@ -6,9 +6,27 @@ import pandas as pd
 import numpy as np
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
+def find_duplicates(arr):
+    duplicates = []
+    indices = {}
+    for i, value in enumerate(arr):
+        if value in indices:
+            duplicates.append(value)
+            indices[value].append(i)
+        else:
+            indices[value] = [i]
+    return duplicates, indices
 
 def dutch_method(xx, yy):
     # compute risk based on dutch method where xx is value axis and yy is probability axis
+    duplicates, indices = find_duplicates(xx)
+    if len(duplicates)>0:
+        for key in indices.keys():
+            if key!=0 and len(indices[key])>1:
+                print("duplicates find")
+                print(xx,"xx before")
+                xx[indices[key][0]]=xx[indices[key][0]]+0.1
+                print(xx, "xx after")
     args = np.argsort(np.array(xx,dtype=np.float32))
     xx = [xx[i] for i in args]
     yy = [yy[i] for i in args]
