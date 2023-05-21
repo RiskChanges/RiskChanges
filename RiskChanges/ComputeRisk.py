@@ -30,10 +30,9 @@ def dutch_method(xx, yy):
         for key in indices.keys():
             if key!=0 and len(indices[key])>1:
                 increment=0.0001
-                if key!=0 and len(indices[key])>1:
-                    for i in indices[key]:
-                        xx[i]=xx[i]+increment if xx[i]+increment not in xx else xx[i]
-                        increment=increment+0.0001
+                for i in indices[key]:
+                    xx[i]=xx[i]+increment if xx[i]+increment not in xx else xx[i]
+                    increment=increment+0.0001
                 
     args = np.argsort(np.array(xx,dtype=np.float64))
     xx = [xx[i] for i in args]
