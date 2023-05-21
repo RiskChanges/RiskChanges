@@ -1,7 +1,7 @@
 import geopandas as gpd
 import pandas as pd
-import logging
-logger = logging.getLogger(__file__)
+# import logging
+# logger = logging.getLogger(__file__)
 
 # write functions to take exposure, loss and risk + admin unit as input and give combined information as an output
 def aggregateexpoure(exposure, adminunit, adminpk):
