@@ -7,17 +7,14 @@ from .RiskChangesOps import rasterops, vectorops, writevector, AggregateData as 
 from .RiskChangesOps.readraster import readhaz
 from .RiskChangesOps.readvector import readear, readAdmin
 from .RiskChangesOps import readmeta
+from sqlalchemy import create_engine
 
+# import logging
+# logger = logging.getLogger(__file__)
 
 def polygonExposure(ear, haz, expid, Ear_Table_PK):
-    # print(ear,"ear")
-    # print(haz,"haz")
-    # print(expid,"expid")
-    # print(Ear_Table_PK,"Ear_Table_PK")
-
     df = pd.DataFrame()
     for ind, row in ear.iterrows():
-        # print(row)
         # rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
         try:
             maska, transform,len_ras = rasterops.cropraster(haz, [row.geom])
@@ -55,20 +52,21 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
             idx = np.isnan(ids)
             ids = np.delete(ids, idx)
             cus = np.delete(cus, idx)
+            
         if len(ids) == 0:
-            print("len of ids zero")
+            # print("len of ids zero")
             # df_temp = pd.DataFrame(np.asarray(('', 0)), columns=['class', 'exposed'])
+            # df_temp['areaOrLen'] = row.geom.area
             df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
             df_temp['geom_id'] = row[Ear_Table_PK]
-            df_temp['areaOrLen'] = row.geom.area
             df_temp['exposure_id'] = expid
             df = df.append(df_temp, ignore_index=True)
             continue
         elif np.max(ids) == 0:
-            print("np max ids zero")
+            # print("np max ids zero")
+            # df_temp['areaOrLen'] = row.geom.area
             df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
             df_temp['geom_id'] = row[Ear_Table_PK]
-            df_temp['areaOrLen'] = row.geom.area
             df_temp['exposure_id'] = expid
             df = df.append(df_temp, ignore_index=True)
             continue
@@ -77,7 +75,7 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
             frequencies[i][1] = (frequencies[i][1]/len_ras)*100
         df_temp = pd.DataFrame(frequencies, columns=['class', 'exposed'])
         df_temp['geom_id'] = row[Ear_Table_PK]
-        df_temp['areaOrLen'] = row.geom.area
+        # df_temp['areaOrLen'] = row.geom.area
         df_temp['exposure_id'] = expid
         df = df.append(df_temp, ignore_index=True)
 
@@ -90,7 +88,6 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
     gt = haz.transform
     buffersize = gt[0]/4
     df = pd.DataFrame()
-    # print(buffersize)
     for ind, row in ear.iterrows():
         polygon = row.geom.buffer(buffersize)
         # rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
@@ -101,7 +98,6 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
             continue
         zoneraster = ma.masked_array(maska, mask=maska == 0)
         # len_ras = zoneraster.count()
-        # print(len_ras)
         if len_ras == 0:
             continue
 
@@ -109,7 +105,6 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
         if ma.is_masked(unique):
             unique = unique.filled(0)
             idx = np.where(unique == 0)[0][0]
-            # print(idx)
             ids = np.delete(unique, idx)
             cus = np.delete(counts, idx)
         else:
@@ -122,14 +117,14 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
         if len(ids) == 0:
             df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
             df_temp['geom_id'] = row[Ear_Table_PK]
-            df_temp['areaOrLen'] = row.geom.length
+            # df_temp['areaOrLen'] = row.geom.length
             df_temp['exposure_id'] = expid
             df = df.append(df_temp, ignore_index=True)
             continue
         elif np.max(ids) == 0:
             df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
             df_temp['geom_id'] = row[Ear_Table_PK]
-            df_temp['areaOrLen'] = row.geom.length
+            # df_temp['areaOrLen'] = row.geom.length
             df_temp['exposure_id'] = expid
             df = df.append(df_temp, ignore_index=True)
             continue
@@ -137,10 +132,9 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
         frequencies = np.asarray((ids, cus)).T
         for i in range(len(frequencies)):
             frequencies[i][1] = (frequencies[i][1]/len_ras)*100
-        # print(frequencies)
         df_temp = pd.DataFrame(frequencies, columns=['class', 'exposed'])
         df_temp['geom_id'] = row[Ear_Table_PK]
-        df_temp['areaOrLen'] = row.geom.length
+        # df_temp['areaOrLen'] = row.geom.length
         df_temp['exposure_id'] = expid
         df = df.append(df_temp, ignore_index=True)
     haz = None
@@ -155,7 +149,7 @@ def pointExposure(ear, haz, expid, Ear_Table_PK):
         classes.append(x[0])
     df_temp['class'] = classes
     df_temp['exposure_id'] = expid
-    df_temp['areaOrLen'] = 1
+    # df_temp['areaOrLen'] = 1
     df_temp['exposed'] = 100
     df_temp['geom_id'] = ear[Ear_Table_PK]
     haz = None
@@ -194,7 +188,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     geometrytype = ear.geom_type.unique()[0]
 
     default_cols = ['exposed', "admin_id", 'class',
-                    'exposure_id', 'geom_id', 'areaOrLen']
+                    'exposure_id', 'geom_id','areaOrLength']
 
     # if value and population column is available, add these to default cols
     # else just add the additional column, we will add null values for these additional cols
@@ -203,16 +197,16 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         default_cols.append(value_col)
     else:
         print('Value colume is not linked!')
-        value_col = 'value_col'
-        additional_cols.append(value_col)
+        # value_col = 'value_col'
+        additional_cols.append('value_col')
 
     # doing same for population
     if (pop_col != None and pop_col != ''):
         default_cols.append(pop_col)
     else:
         print("population colume is not lined!")
-        pop_col = 'pop_col'
-        additional_cols.append(pop_col)
+        # pop_col = 'pop_col'
+        additional_cols.append('pop_col')
 
     # check the geometry and run the corresponding calcualtion function
     if (geometrytype == 'Polygon' or geometrytype == 'MultiPolygon'):
@@ -233,10 +227,12 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
         df = lineExposure(ear, haz, expid, Ear_Table_PK)
     haz = None
+    
     assert not df.empty, f"The aggregated dataframe in exposure returned empty, this error may arise if input shapes do not overlap raster"
     df = pd.merge(left=df, right=ear, left_on='geom_id',
                   right_on=Ear_Table_PK, right_index=False)
     df = gpd.GeoDataFrame(df, geometry='geom')
+    
     # if not onlyaggregated: #due to change of 24 may 2022, it is redundant now because of else statement in coming condition.
     #     df['exposure_id'] = expid
     #     writevector.writeexposure(df, con, schema)
@@ -260,25 +256,38 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     else:
         df['admin_id'] = ''
 
-    # print('default_columns', default_cols)
     df = df[default_cols]
     df['exposure_id'] = expid
-
     # if value col and pop col are not defined, we assign the value to nan
+    # df['areaOrLen_exposure'] = np.nan
     if len(additional_cols) > 0:
-        if value_col in additional_cols:
-            df[value_col] = np.nan
-        if pop_col in additional_cols:
-            df[pop_col] = np.nan
+        if 'value_col' in additional_cols:
+            df['value_exposure'] = np.nan
+            df['value_exposure_rel'] = np.nan
+            # df[value_col] = np.nan
+        if 'pop_col' in additional_cols:
+            df['population_exposure'] = np.nan
+            df['population_exposure_rel'] = np.nan
+            # df[pop_col] = np.nan
 
     # default columns for standard database table
-    df = df.rename(columns={value_col: "value_exposure",
-                            pop_col: "population_exposure"})
-    df['areaOrLen'] = df['exposed'] * df['areaOrLen']/100
-    df['value_exposure'] = df['exposed'] * df['value_exposure']/100
-    df['population_exposure'] = df['exposed'] * df['population_exposure']/100
-    # print(df.columns,"columnsssssssssssssssssss")
-    # print(len(df),"length of dataframe")
+    # df = df.rename(columns={value_col: "value_exposure",
+                            # pop_col: "population_exposure",
+                            # })
+    df['areaOrLen'] = df['exposed'] * df['areaOrLength']/100  
+    if pop_col:
+        df['population_exposure'] = df['exposed'] * df[pop_col]/100 
+        df['population_exposure_rel'] = np.where(df['population_exposure'] != 0, df['population_exposure'] * 100 / df[pop_col], 0)
+    if value_col:
+        df['value_exposure'] = df['exposed'] * df[value_col]/100
+        df['value_exposure_rel'] = np.where(df['value_exposure'] != 0, df['value_exposure'] * 100 / df[value_col], 0)
+    
+    if 'areaOrLength' in df.columns:
+        df=df.drop('areaOrLength',axis=1)
+    if value_col in df.columns:
+        df=df.drop(value_col,axis=1)
+    if pop_col in df.columns:
+        df=df.drop(pop_col,axis=1)
     writevector.writeexposure(df, con, schema)
 
     # else:

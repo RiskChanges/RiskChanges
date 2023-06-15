@@ -5,8 +5,8 @@ import numpy as np
 from .RiskChangesOps.readvulnerability import readIntVuln, readSusVuln
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
-# import logging
-# logger = logging.getLogger(__file__)
+import logging
+logger = logging.getLogger(__file__)
 
 #! create function for similar calculation
 
@@ -22,7 +22,6 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
     thresholds.sort()
     min_thresholds=[float(val) for val in thresholds]
     type_col = metadata["TypeColumn"]
-    
     # base = float(metadata["base"])
     # maxval = float(metadata["threshold"])
     # stepsize = float(metadata["stepsize"])
@@ -42,7 +41,6 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
             convert_dict[i+1] = name
         except Exception as e:
             print(str(e),"Error in getSummary")
-            # logger.info(f"{str(e)} Error in getSummary")
             pass
         # if it is last class, then need to assign max class for all result
         if (val == min_thresholds[-1]):
@@ -55,7 +53,6 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
     # if column is count just count the number of feature exposed
     if column == 'count':
         exposure[column] = 1
-
     if not agg:
         summary = pd.pivot_table(exposure, values=column, index=[type_col],
                                  columns=["class"], aggfunc=np.sum, fill_value=0)
@@ -74,7 +71,7 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
     return summary
 
 
-def getShapefile(con, exposureid, column='exposed', agg=False):
+def getShapefile(con, exposureid, column='areaOrLen', agg=False):
     if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
         raise ValueError(
             "column: status must be one of areaOrLen, value_exposure or population_exposure")
@@ -93,19 +90,16 @@ def getShapefile(con, exposureid, column='exposed', agg=False):
     adminid = metadata['adminid']
     earpk = metadata["earPK"]
     earid = metadata['earID']
-    earid = metadata['earID']
     # stepsize = float(metadata["stepsize"])
     
     # min_thresholds = np.arange(
     #     start=base, stop=maxval+1, step=stepsize).tolist()
     convert_dict = {}
     for i, val in enumerate(min_thresholds):
-
         # the default type for val1 is char, change it to float and compare
         classificationScheme['val1'] = classificationScheme['val1'].astype(
             float)
         name = classificationScheme.query(f'val1 == {val}')
-
         # not every hazard class are avialable on exposure table
         # so try except to pass even the class is not available
         try:
@@ -178,7 +172,7 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
     elif column == 'value_exposure':
         aggcolumn = costcol
     else:
-        aggcolumn = 'areaOrLen'
+        aggcolumn = 'areaOrLength'
     for i, val in enumerate(min_thresholds):
 
         # the default type for val1 is char, change it to float and compare
@@ -205,11 +199,11 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
     # if column is count just count the number of feature exposed
     if column == 'count':
         exposure[column] = 1
-
     if not agg:
         summary = pd.pivot_table(exposure, values=column, index=[type_col],
                                  columns=["class"], aggfunc=np.sum, fill_value=0)
         agg = exposure[[aggcolumn, type_col]].groupby(type_col).sum()
+        
         summary = pd.merge(left=summary, right=agg,
                            left_on=type_col, right_on=type_col)
         summary[summary.columns.difference([aggcolumn])] = summary[summary.columns.difference([
@@ -236,8 +230,8 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
     return summary
 
 
-def getShapefileRel(con, exposureid, column='exposed', agg=False):
-    if column not in ['exposed', 'areaOrLen', 'value_exposure', 'population_exposure', 'count']:
+def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
+    if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
         raise ValueError(
             "column: status must be one of exposed %, areaOrLen, populationexp or valueexp")
     metadata = readmeta.computeloss_meta(con, exposureid)
@@ -254,7 +248,6 @@ def getShapefileRel(con, exposureid, column='exposed', agg=False):
     adminid = metadata['adminid']
     earpk = metadata["earPK"]
     earid = metadata['earID']
-    earid = metadata['earID']
     # stepsize = float(metadata["stepsize"])
     # min_thresholds = np.arange(
     #     start=base, stop=maxval+1, step=stepsize).tolist()
@@ -266,23 +259,20 @@ def getShapefileRel(con, exposureid, column='exposed', agg=False):
     elif column == 'value_exposure':
         aggcolumn = costcol
     else:
-        aggcolumn = 'areaOrLen'
+        aggcolumn = 'areaOrLength'
     for i, val in enumerate(min_thresholds):
 
         # the default type for val1 is char, change it to float and compare
         classificationScheme['val1'] = classificationScheme['val1'].astype(
             float)
         name = classificationScheme.query(f'val1 == {val}')
-
         # not every hazard class are avialable on exposure table
         # so try except to pass even the class is not available
         try:
             name = name['class_name'].to_list()[0]
             convert_dict[i+1] = name
-
         except:
             pass
-
         # if it is last class, then need to assign max class for all result
         if (val == min_thresholds[-1]):
             exposure['class'] = np.where(
