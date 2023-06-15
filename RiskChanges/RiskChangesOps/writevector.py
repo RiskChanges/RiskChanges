@@ -9,10 +9,10 @@ def writeexposure(df, connstr, schema):
     # Execute the raw SQL statement to rename the column and add column value_exposure_rel, population_exposure_rel if not exists
     #! this is not required if updated existing table once
     with engine.connect() as connection:
-        try:
-            connection.execute('''ALTER TABLE "{0}"."exposure_result" RENAME COLUMN "areaOrLen_exposure" TO "areaOrLen"'''.format(schema))
-        except:
-            pass
+        # try:
+        #     connection.execute('''ALTER TABLE "{0}"."exposure_result" RENAME COLUMN "areaOrLen_exposure" TO "areaOrLen"'''.format(schema))
+        # except:
+        #     pass
         connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
                     "exposure_result", 'value_exposure_rel', 'float', schema))
         connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(

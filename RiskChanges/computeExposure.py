@@ -145,13 +145,20 @@ def pointExposure(ear, haz, expid, Ear_Table_PK):
     coords = [(x, y) for x, y in zip(ear.geometry.x, ear.geometry.y)]
     df_temp = pd.DataFrame()
     classes = []
+    exposed_values = []
     for x in haz.sample(coords):
-        classes.append(x[0])
+        # print(x,type(x))
+        if int(x[0]) == -999:
+            classes.append(0)
+            exposed_values.append(0)
+        else:
+            classes.append(x[0])
+            exposed_values.append(100)
     df_temp['class'] = classes
+    df_temp['exposed'] = exposed_values
     df_temp['exposure_id'] = expid
-    # df_temp['areaOrLen'] = 1
-    df_temp['exposed'] = 100
     df_temp['geom_id'] = ear[Ear_Table_PK]
+    # df_temp['areaOrLen'] = 1
     haz = None
     return df_temp
 
