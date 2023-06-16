@@ -1,14 +1,27 @@
 import geopandas
 from sqlalchemy import *
+import random
+import logging
+logger = logging.getLogger(__file__)
 
-
+#! mention all default column in exposure, loss and risk result
 def loadshp(shpInput, engine, lyrName, schema, index,calcAreaOrLen=False):
+    default_columns=['exposed','exp_id','areaOrLen','value_exposure','value_exposure_rel','population_exposure','population_exposure_rel']
     try:
         gdf = geopandas.read_file(shpInput)
         gdf = gdf[gdf.is_valid]
         gdf[index] = gdf.index
+        df_columns=gdf.columns
+
+        logger.info(f"{df_columns} df columns")
+        for col in default_columns:
+            if col in df_columns:
+                random_number = random.randint(10, 99)
+                gdf.rename(columns={col: f'{col}_{random_number}'}, inplace=True)
+
         gdf.to_postgis(name=lyrName, con=engine,
                                 schema=schema, if_exists='replace')
+        
         if calcAreaOrLen:
             geometrytype = gdf.geom_type.unique()[0]
             with engine.connect() as connection:
