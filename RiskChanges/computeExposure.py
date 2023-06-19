@@ -15,7 +15,6 @@ from sqlalchemy import create_engine
 def polygonExposure(ear, haz, expid, Ear_Table_PK):
     df = pd.DataFrame()
     for ind, row in ear.iterrows():
-        # rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
         try:
             maska, transform,len_ras = rasterops.cropraster(haz, [row.geom])
         except:
@@ -29,8 +28,6 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
         The mask is set to maska == 0, which means that all elements in maska with a value of zero (which are likely to be nodata values) will be masked out. This effectively removes nodata values from the computation of any statistics or analyses performed on zoneraster.
         '''
         zoneraster = ma.masked_array(maska, mask=maska == 0)
-        # len_ras = zoneraster.count()
-        # print(len_ras,zoneraster.count(),"len_ras")
         
         if len_ras == 0:
             print("length of raster zero")
@@ -54,7 +51,6 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
             cus = np.delete(cus, idx)
             
         if len(ids) == 0:
-            # print("len of ids zero")
             # df_temp = pd.DataFrame(np.asarray(('', 0)), columns=['class', 'exposed'])
             # df_temp['areaOrLen'] = row.geom.area
             df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
@@ -63,7 +59,6 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
             df = df.append(df_temp, ignore_index=True)
             continue
         elif np.max(ids) == 0:
-            # print("np max ids zero")
             # df_temp['areaOrLen'] = row.geom.area
             df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
             df_temp['geom_id'] = row[Ear_Table_PK]
@@ -90,14 +85,11 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
     df = pd.DataFrame()
     for ind, row in ear.iterrows():
         polygon = row.geom.buffer(buffersize)
-        # rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
         try:
-            # maska, transform = rasterops.cropraster(haz, [polygon])
             maska, transform,len_ras = rasterops.cropraster(haz, [polygon])
         except:
             continue
         zoneraster = ma.masked_array(maska, mask=maska == 0)
-        # len_ras = zoneraster.count()
         if len_ras == 0:
             continue
 
@@ -147,7 +139,6 @@ def pointExposure(ear, haz, expid, Ear_Table_PK):
     classes = []
     exposed_values = []
     for x in haz.sample(coords):
-        # print(x,type(x))
         if int(x[0]) == -999:
             classes.append(0)
             exposed_values.append(0)
@@ -161,7 +152,6 @@ def pointExposure(ear, haz, expid, Ear_Table_PK):
     # df_temp['areaOrLen'] = 1
     haz = None
     return df_temp
-
     # coords = [(x,y) for x, y in zip(ear.geometry.x, ear.geometry.y)]
     # ear['class'] = [x for x in haz.sample(coords)]
     # ear['exposure_id'] = expid
@@ -177,11 +167,8 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     onlyaggregated = kwargs.get('only_aggregated', True)
     adminid = kwargs.get('adminunit_id', None)
     haz_file = kwargs.get('haz_file', None)
-
     ear = readear(con, earid)
     haz = readhaz(con, hazid, haz_file)
-    # assert vectorops.cehckprojection(
-    #    ear, haz), "The hazard and EAR do not have same projection system please check it first"
     if vectorops.cehckprojection(ear, haz):
 
         warnings.warn("The input co-ordinate system for hazard and EAR were differe, we have updated it for now on the fly but from next time please check your data before computation")
@@ -203,7 +190,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     if (value_col != None and value_col != ''):
         default_cols.append(value_col)
     else:
-        print('Value colume is not linked!')
+        # print('Value colume is not linked!')
         # value_col = 'value_col'
         additional_cols.append('value_col')
 
@@ -211,7 +198,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     if (pop_col != None and pop_col != ''):
         default_cols.append(pop_col)
     else:
-        print("population colume is not lined!")
+        # print("population colume is not lined!")
         # pop_col = 'pop_col'
         additional_cols.append('pop_col')
 
@@ -220,11 +207,9 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         ear['areacheck'] = ear.geom.area
         mean_area = ear.areacheck.mean()
         if mean_area <= 0:
-            print("mean area less than zero")
             ear['geom'] = ear['geom'].centroid
             df = pointExposure(ear, haz, expid, Ear_Table_PK)
         else:
-            print("call to polygon exposure")
             df = polygonExposure(ear, haz, expid, Ear_Table_PK)
     # point exposure
     elif(geometrytype == 'Point' or geometrytype == 'MultiPoint'):
@@ -267,15 +252,15 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     df['exposure_id'] = expid
     # if value col and pop col are not defined, we assign the value to nan
     # df['areaOrLen_exposure'] = np.nan
+    # df[value_col] = np.nan
+    # df[pop_col] = np.nan
     if len(additional_cols) > 0:
         if 'value_col' in additional_cols:
             df['value_exposure'] = np.nan
             df['value_exposure_rel'] = np.nan
-            # df[value_col] = np.nan
         if 'pop_col' in additional_cols:
             df['population_exposure'] = np.nan
             df['population_exposure_rel'] = np.nan
-            # df[pop_col] = np.nan
 
     # default columns for standard database table
     # df = df.rename(columns={value_col: "value_exposure",
@@ -288,7 +273,8 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     if value_col:
         df['value_exposure'] = df['exposed'] * df[value_col]/100
         df['value_exposure_rel'] = np.where(df['value_exposure'] != 0, df['value_exposure'] * 100 / df[value_col], 0)
-    
+    df['count']=np.where(df['exposed'] == 0, 0, 1)
+    df['count_rel']=np.where(df['exposed'] == 0, 0, 100)    
     if 'areaOrLength' in df.columns:
         df=df.drop('areaOrLength',axis=1)
     if value_col in df.columns:
@@ -321,3 +307,14 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
 # con="postgresql://postgres:puntu@localhost:5433/SDSSv5"
 # df=ComputeExposure(con,549,452,9999)
 # writevector.writeexposure(df,con,schema)
+
+'''
+rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
+len_ras = zoneraster.count()
+print(len_ras,zoneraster.count(),"len_ras")
+rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
+maska, transform = rasterops.cropraster(haz, [polygon])
+len_ras = zoneraster.count()
+assert vectorops.cehckprojection(
+   ear, haz), "The hazard and EAR do not have same projection system please check it first"
+''' 

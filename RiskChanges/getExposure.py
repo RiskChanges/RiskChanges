@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__file__)
 #! create function for similar calculation
 
-def add_hazard_class(exposure,min_thresholds):
+def add_hazard_class(exposure,min_thresholds,classificationScheme):
     try:
         convert_dict = {}
         for i, val in enumerate(min_thresholds):
@@ -26,6 +26,7 @@ def add_hazard_class(exposure,min_thresholds):
             if (val == min_thresholds[-1]):
                 exposure['class'] = np.where(
                     exposure['class'] >= i+1, i+1, exposure['class'])
+        exposure['class'].replace(convert_dict, inplace=True)
         return exposure
     except Exception as e:
         return {'error':str(e)}      
@@ -50,12 +51,12 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         #     start=base, stop=maxval, step=stepsize).tolist()
         
         # Change the classes to the user defined class
-        add_hazard_class_result=add_hazard_class(exposure,min_thresholds)
+        add_hazard_class_result=add_hazard_class(exposure,min_thresholds,classificationScheme)
         if isinstance(add_hazard_class_result,dict):
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result['error']}")
         else:
             exposure=add_hazard_class_result
-        exposure['class'].replace(convert_dict, inplace=True)
+        # exposure['class'].replace(convert_dict, inplace=True)
         
         # if column is count just count the number of feature exposed
         if column == 'count':
@@ -102,13 +103,13 @@ def getShapefile(con, exposureid, column='areaOrLen', agg=False):
         # stepsize = float(metadata["stepsize"])
         # min_thresholds = np.arange(
         #     start=base, stop=maxval+1, step=stepsize).tolist()
-        add_hazard_class_result=add_hazard_class(exposure,min_thresholds)
+        add_hazard_class_result=add_hazard_class(exposure,min_thresholds,classificationScheme)
         if isinstance(add_hazard_class_result,dict):
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result['error']}")
         else:
             exposure=add_hazard_class_result
         # Change the classes to the user defined class
-        exposure["class"].replace(convert_dict, inplace=True)
+        # exposure["class"].replace(convert_dict, inplace=True)
 
         # if column is count just count the number of feature exposed
         if column == 'count':
@@ -160,7 +161,7 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
         # stepsize = float(metadata["stepsize"])
         # min_thresholds = np.arange(
         #     start=base, stop=maxval+1, step=stepsize).tolist()
-        convert_dict = {}
+        # convert_dict = {}
         if column == 'population_exposure':
             aggcolumn = popcol
         elif column == 'value_exposure':
@@ -168,13 +169,13 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
         else:
             aggcolumn = 'areaOrLength'
         
-        add_hazard_class_result=add_hazard_class(exposure,min_thresholds)
+        add_hazard_class_result=add_hazard_class(exposure,min_thresholds,classificationScheme)
         if isinstance(add_hazard_class_result,dict):
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result['error']}")
         else:
             exposure=add_hazard_class_result
         # Change the classes to the user defined class
-        exposure['class'].replace(convert_dict, inplace=True)
+        # exposure['class'].replace(convert_dict, inplace=True)
         # if column is count just count the number of feature exposed
         if column == 'count':
             exposure[column] = 1
@@ -182,11 +183,11 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
             summary = pd.pivot_table(exposure, values=column, index=[type_col],
                                     columns=["class"], aggfunc=np.sum, fill_value=0)
             agg = exposure[[aggcolumn, type_col]].groupby(type_col).sum()
-            
             summary = pd.merge(left=summary, right=agg,
                             left_on=type_col, right_on=type_col)
             summary[summary.columns.difference([aggcolumn])] = summary[summary.columns.difference([
                 aggcolumn])].div(summary[aggcolumn], axis=0)*100
+            
             summary = summary.reset_index()
             summary = summary.rename(columns={type_col: "Ear Class"})
         else:
@@ -231,7 +232,7 @@ def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
         # stepsize = float(metadata["stepsize"])
         # min_thresholds = np.arange(
         #     start=base, stop=maxval+1, step=stepsize).tolist()
-        convert_dict = {}
+        # convert_dict = {}
         costcol = metadata['costColumn']
         popcol = metadata['populColumn']
         if column == 'population_exposure':
@@ -240,13 +241,13 @@ def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
             aggcolumn = costcol
         else:
             aggcolumn = 'areaOrLength'
-        add_hazard_class_result=add_hazard_class(exposure,min_thresholds)
+        add_hazard_class_result=add_hazard_class(exposure,min_thresholds,classificationScheme)
         if isinstance(add_hazard_class_result,dict):
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result['error']}")
         else:
             exposure=add_hazard_class_result
         # Change the classes to the user defined class
-        exposure["class"].replace(convert_dict, inplace=True)
+        # exposure["class"].replace(convert_dict, inplace=True)
 
         # if column is count just count the number of feature exposed
         if column == 'count':

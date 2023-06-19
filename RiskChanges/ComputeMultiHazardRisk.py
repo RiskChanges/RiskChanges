@@ -297,7 +297,7 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
         # weights = groupcombinations[group]['weights']
         
         losscombinations = group['lossIds']
-        print(losscombinations,"losscombinationslosscombinations")
+        # print(losscombinations,"losscombinationslosscombinations")
         hazardinteraction = group['interaction']
         hazardinteractions = []
         if isinstance(hazardinteraction, str):
@@ -340,7 +340,7 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
             if len(hazardinteractions) == 0:
                 continue
             elif len(hazardinteractions) == 1:
-                print("hazard interaction length 1")
+                # print("hazard interaction length 1")
                 if haz_prob != None:
                     haz_prob_arg = haz_prob[0]
                 else:
@@ -360,7 +360,7 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
                     combined_loss_step = combineLosses(
                         loss_normalization, single_interaction, interaction, haz_prob_arg)
                     if second:
-                        print("secondddd")
+                        # print("secondddd")
                         combined_loss = combined_loss_step
                         second = False
                     else:
@@ -368,11 +368,11 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
                         cols = combined_loss_step.columns.tolist()
                         cols_selected = [
                             word for word in cols if ('combined' in word)]
-                        print(combined_loss['Unit_ID'],"compute mul risk combined loss")
-                        print(combined_loss_step['Unit_ID'],"compute mul risk combined loss step")
+                        # print(combined_loss['Unit_ID'],"compute mul risk combined loss")
+                        # print(combined_loss_step['Unit_ID'],"compute mul risk combined loss step")
                         merged = pd.merge(left=combined_loss, right=combined_loss_step, how='outer', left_on=[
                                           'Unit_ID'], right_on=['Unit_ID'], right_index=False, suffixes=('_left', '_right'))
-                        print(merged['Unit_ID'],"MERGED UNIT ID")
+                        # print(merged['Unit_ID'],"MERGED UNIT ID")
                         del combined_loss, combined_loss_step
                         merged_cols = merged.columns.tolist()
                         for col in cols_selected:
@@ -388,8 +388,8 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
             else:
                 cols = combined_loss.columns.values.tolist()
                 cols_selected = [word for word in cols if ('combined' in word)]
-                print(combined_loss['Unit_ID'],"compute mul risk combined loss 2")
-                print(final_loss['Unit_ID'],"compute mul risk final loss 2")
+                # print(combined_loss['Unit_ID'],"compute mul risk combined loss 2")
+                # print(final_loss['Unit_ID'],"compute mul risk final loss 2")
                 merged = pd.merge(left=final_loss, right=combined_loss, how='outer', left_on=[
                                   'Unit_ID'], right_on=['Unit_ID'], right_index=False, suffixes=('_left', '_right'))
                 del final_loss, combined_loss
