@@ -9,9 +9,6 @@ from .RiskChangesOps.readvector import readear, readAdmin
 from .RiskChangesOps import readmeta
 from sqlalchemy import create_engine
 
-# import logging
-# logger = logging.getLogger(__file__)
-
 def polygonExposure(ear, haz, expid, Ear_Table_PK):
     df = pd.DataFrame()
     for ind, row in ear.iterrows():
@@ -170,7 +167,6 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     ear = readear(con, earid)
     haz = readhaz(con, hazid, haz_file)
     if vectorops.cehckprojection(ear, haz):
-
         warnings.warn("The input co-ordinate system for hazard and EAR were differe, we have updated it for now on the fly but from next time please check your data before computation")
         ear = vectorops.changeprojection(ear, haz)
 
@@ -180,7 +176,6 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     pop_col = metatable.col_population_avg[0]
     schema = metatable.workspace[0]
     geometrytype = ear.geom_type.unique()[0]
-
     default_cols = ['exposed', "admin_id", 'class',
                     'exposure_id', 'geom_id','areaOrLength']
 
@@ -198,10 +193,35 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     if (pop_col != None and pop_col != ''):
         default_cols.append(pop_col)
     else:
-        # print("population colume is not lined!")
         # pop_col = 'pop_col'
         additional_cols.append('pop_col')
 
+    # if is_aggregated:
+    #     admin_unit = readAdmin(con, adminid)
+    #     adminmeta = readmeta.getAdminMeta(con, adminid)
+    #     adminpk = adminmeta.col_admin[0] or adminmeta.data_id[0]
+    #     admin_unit = gpd.GeoDataFrame(admin_unit, geometry='geom')
+
+    #     # check whether adminpk and ear columns have same name, issue #80
+    #     df_columns = list(ear.columns)
+    #     if adminpk in df_columns:
+    #         ear = ear.rename(columns={adminpk: f"{adminpk}_ear"})
+    #     print(len(ear),"len ear beforeeeeeeeee")
+
+    #     overlaid_Data = gpd.overlay(ear, admin_unit[[
+    #                                 adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
+
+    #     # overlaid_Data_false = gpd.overlay(ear, admin_unit[[
+    #     #                             adminpk, 'geom']], how='intersection', make_valid=False, keep_geom_type=True)
+    #     ear = overlaid_Data.rename(columns={adminpk: 'admin_id'})
+    #     ear = ear.rename(columns={"geometry": "geom"})
+    #     ear = gpd.GeoDataFrame(ear, geometry='geom')
+    #     print(len(ear),"len ear afterrrrrrrrr")
+    #     # print(len(overlaid_Data_false),"length overlaid_Data_falseeeeeeee")
+    # # if exposure is on individual item, admin_unit must be none
+    # else:
+    #     ear['admin_id'] = ''
+    
     # check the geometry and run the corresponding calcualtion function
     if (geometrytype == 'Polygon' or geometrytype == 'MultiPolygon'):
         ear['areacheck'] = ear.geom.area
@@ -219,11 +239,12 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
         df = lineExposure(ear, haz, expid, Ear_Table_PK)
     haz = None
-    
     assert not df.empty, f"The aggregated dataframe in exposure returned empty, this error may arise if input shapes do not overlap raster"
     df = pd.merge(left=df, right=ear, left_on='geom_id',
                   right_on=Ear_Table_PK, right_index=False)
     df = gpd.GeoDataFrame(df, geometry='geom')
+    # print(len(df),"len ear after merge")
+    # print(df.columns," ear columns after merge")
     
     # if not onlyaggregated: #due to change of 24 may 2022, it is redundant now because of else statement in coming condition.
     #     df['exposure_id'] = expid
@@ -239,10 +260,23 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         df_columns = list(df.columns)
         if adminpk in df_columns:
             df = df.rename(columns={adminpk: f"{adminpk}_ear"})
+        temp_df=df
+        if (geometrytype=='Polygon' or geometrytype == 'MultiPolygon'):
+            temp_df['centroid'] = temp_df.centroid
+            temp_centroid_df=gpd.GeoDataFrame(temp_df, geometry='centroid')
 
-        overlaid_Data = gpd.overlay(df, admin_unit[[
+            overlaid_Data = gpd.overlay(temp_centroid_df, admin_unit[[
                                     adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
-        df = overlaid_Data.rename(columns={adminpk: 'admin_id'})
+            # overlaid_Data = gpd.overlay(df, admin_unit[[
+            #                             adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
+            df = overlaid_Data.rename(columns={adminpk: 'admin_id'})
+        elif(geometrytype == 'Point' or geometrytype == 'MultiPoint'):
+            overlaid_Data = gpd.overlay(df, admin_unit[[
+                                    adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
+            df = overlaid_Data.rename(columns={adminpk: 'admin_id'})
+        elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
+            pass
+
 
     # if exposure is on individual item, admin_unit must be none
     else:
@@ -281,6 +315,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         df=df.drop(value_col,axis=1)
     if pop_col in df.columns:
         df=df.drop(pop_col,axis=1)
+    print(len(df),"len ear final")
     writevector.writeexposure(df, con, schema)
 
     # else:
