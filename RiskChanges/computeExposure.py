@@ -76,12 +76,16 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
 
 
 def lineExposure(ear, haz, expid, Ear_Table_PK):
-
     gt = haz.transform
     buffersize = gt[0]/4
     df = pd.DataFrame()
     for ind, row in ear.iterrows():
-        polygon = row.geom.buffer(buffersize)
+        
+        try:
+            polygon = row.geom.buffer(buffersize)
+        except:
+            polygon = row.geometry.buffer(buffersize)
+            
         try:
             maska, transform,len_ras = rasterops.cropraster(haz, [polygon])
         except:
@@ -221,41 +225,12 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     # # if exposure is on individual item, admin_unit must be none
     # else:
     #     ear['admin_id'] = ''
-    
-    # check the geometry and run the corresponding calcualtion function
-    if (geometrytype == 'Polygon' or geometrytype == 'MultiPolygon'):
-        ear['areacheck'] = ear.geom.area
-        mean_area = ear.areacheck.mean()
-        if mean_area <= 0:
-            ear['geom'] = ear['geom'].centroid
-            df = pointExposure(ear, haz, expid, Ear_Table_PK)
-        else:
-            df = polygonExposure(ear, haz, expid, Ear_Table_PK)
-    # point exposure
-    elif(geometrytype == 'Point' or geometrytype == 'MultiPoint'):
-        df = pointExposure(ear, haz, expid, Ear_Table_PK)
-
-    # line exposure
-    elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
-        df = lineExposure(ear, haz, expid, Ear_Table_PK)
-    haz = None
-    assert not df.empty, f"The aggregated dataframe in exposure returned empty, this error may arise if input shapes do not overlap raster"
-    df = pd.merge(left=df, right=ear, left_on='geom_id',
-                  right_on=Ear_Table_PK, right_index=False)
-    df = gpd.GeoDataFrame(df, geometry='geom')
-    # print(len(df),"len ear after merge")
-    # print(df.columns," ear columns after merge")
-    
-    # if not onlyaggregated: #due to change of 24 may 2022, it is redundant now because of else statement in coming condition.
-    #     df['exposure_id'] = expid
-    #     writevector.writeexposure(df, con, schema)
-
+    df=ear
     if is_aggregated:
         admin_unit = readAdmin(con, adminid)
         adminmeta = readmeta.getAdminMeta(con, adminid)
         adminpk = adminmeta.col_admin[0] or adminmeta.data_id[0]
         admin_unit = gpd.GeoDataFrame(admin_unit, geometry='geom')
-
         # check whether adminpk and ear columns have same name, issue #80
         df_columns = list(df.columns)
         if adminpk in df_columns:
@@ -275,12 +250,80 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
                                     adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
             df = overlaid_Data.rename(columns={adminpk: 'admin_id'})
         elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
-            pass
-
-
+            temp_df['areaOrLen_original']=temp_df.geometry.length.round(3)
+            overlaid_Data = gpd.overlay(temp_df, admin_unit[[
+                                    adminpk, 'geom']], how='intersection', make_valid=True, keep_geom_type=True)
+            overlaid_Data['areaOrLen_overlaid']=overlaid_Data.geometry.length.round(3)
+            non_zero_length_condition=(overlaid_Data['areaOrLen_overlaid']!=0.000)
+            overlaid_Data=overlaid_Data[non_zero_length_condition]
+            overlaid_Data['occupied_percent']=overlaid_Data['areaOrLen_overlaid']*100/overlaid_Data['areaOrLen_original']
+            overlaid_Data=overlaid_Data.drop('areaOrLen_original',axis=1)
+            overlaid_Data=overlaid_Data.drop('areaOrLength',axis=1)
+            df = overlaid_Data.rename(columns={adminpk: 'admin_id','areaOrLen_overlaid':'areaOrLength',"geometry":"geom"})
     # if exposure is on individual item, admin_unit must be none
     else:
         df['admin_id'] = ''
+        
+        
+    # # check the geometry and run the corresponding calcualtion function
+    # if (geometrytype == 'Polygon' or geometrytype == 'MultiPolygon'):
+    #     ear['areacheck'] = ear.geom.area
+    #     mean_area = ear.areacheck.mean()
+    #     if mean_area <= 0:
+    #         ear['geom'] = ear['geom'].centroid
+    #         df = pointExposure(ear, haz, expid, Ear_Table_PK)
+    #     else:
+    #         df = polygonExposure(ear, haz, expid, Ear_Table_PK)
+    # # point exposure
+    # elif(geometrytype == 'Point' or geometrytype == 'MultiPoint'):
+    #     df = pointExposure(ear, haz, expid, Ear_Table_PK)
+
+    # # line exposure
+    # elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
+    #     df = lineExposure(ear, haz, expid, Ear_Table_PK)
+    # haz = None
+    # assert not df.empty, f"The aggregated dataframe in exposure returned empty, this error may arise if input shapes do not overlap raster"
+    # df = pd.merge(left=df, right=ear, left_on='geom_id',
+    #               right_on=Ear_Table_PK, right_index=False)
+    # df = gpd.GeoDataFrame(df, geometry='geom')
+    
+    # check the geometry and run the corresponding calcualtion function
+    if (geometrytype == 'Polygon' or geometrytype == 'MultiPolygon'):
+        print(df.columns,"polygon df columns")
+        
+        df['areacheck'] = df.geom.area
+        mean_area = df.areacheck.mean()
+        if mean_area <= 0:
+            df['geom'] = df['geom'].centroid
+            exp_df = pointExposure(df, haz, expid, Ear_Table_PK)
+        else:
+            exp_df = polygonExposure(df, haz, expid, Ear_Table_PK)
+    # point exposure
+    elif(geometrytype == 'Point' or geometrytype == 'MultiPoint'):
+        print(df.columns,"point df columns")
+        
+        exp_df = pointExposure(df, haz, expid, Ear_Table_PK)
+
+    # line exposure
+    elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
+        print(df.columns,"line df columns")
+        exp_df = lineExposure(df, haz, expid, Ear_Table_PK)
+        
+    haz = None
+    assert not exp_df.empty, f"The aggregated dataframe in exposure returned empty, this error may arise if input shapes do not overlap raster"
+    df = pd.merge(left=exp_df, right=df, left_on='geom_id',
+                  right_on=Ear_Table_PK, right_index=False)
+    df = gpd.GeoDataFrame(df)
+    # df = gpd.GeoDataFrame(df, geometry='geom')
+    
+    
+    # print(len(df),"len ear after merge")
+    # print(df.columns," ear columns after merge")
+    
+    # if not onlyaggregated: #due to change of 24 may 2022, it is redundant now because of else statement in coming condition.
+    #     df['exposure_id'] = expid
+    #     writevector.writeexposure(df, con, schema)
+
 
     df = df[default_cols]
     df['exposure_id'] = expid
@@ -315,7 +358,6 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         df=df.drop(value_col,axis=1)
     if pop_col in df.columns:
         df=df.drop(pop_col,axis=1)
-    print(len(df),"len ear final")
     writevector.writeexposure(df, con, schema)
 
     # else:
