@@ -128,7 +128,7 @@ def getShapefile(con, exposureid, column='areaOrLen', agg=False):
             adminmeta = readmeta.getAdminMeta(con, adminid)
             adminpk = adminmeta.col_admin[0]
             summary = pd.merge(left=summary, right=admin,
-                            left_on='admin_id', right_on=adminpk, right_index=False)
+                            left_on='admin_id', right_on=adminpk, right_index=False,how='right')
             summary = gpd.GeoDataFrame(summary, geometry='geom')
         summary = summary.fillna(0)
         #to drop column 0.0 if exists
@@ -273,7 +273,7 @@ def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
             adminmeta = readmeta.getAdminMeta(con, adminid)
             adminpk = adminmeta.col_admin[0]
             summary = pd.merge(left=summary, right=admin,
-                            left_on='admin_id', right_on=adminpk, right_index=False)
+                            left_on='admin_id', right_on=adminpk, right_index=False,how='right')
             summary = gpd.GeoDataFrame(summary, geometry='geom')
         summary = summary.fillna(0)
         #to drop column 0.0 if exists
