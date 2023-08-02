@@ -76,11 +76,14 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
 
 
 def lineExposure(ear, haz, expid, Ear_Table_PK):
+    print("*******************1111111111111111111")
+    print(Ear_Table_PK,"Ear_Table_PK")
+    print("*******************1111111111111111111")
+    
     gt = haz.transform
     buffersize = gt[0]/4
     df = pd.DataFrame()
     for ind, row in ear.iterrows():
-        
         try:
             polygon = row.geom.buffer(buffersize)
         except:
@@ -127,6 +130,7 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
             frequencies[i][1] = (frequencies[i][1]/len_ras)*100
         df_temp = pd.DataFrame(frequencies, columns=['class', 'exposed'])
         df_temp['geom_id'] = row[Ear_Table_PK]
+        df_temp['areaOrLength'] = row['areaOrLength']
         # df_temp['areaOrLen'] = row.geom.length
         df_temp['exposure_id'] = expid
         df = df.append(df_temp, ignore_index=True)
@@ -289,8 +293,6 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     
     # check the geometry and run the corresponding calcualtion function
     if (geometrytype == 'Polygon' or geometrytype == 'MultiPolygon'):
-        print(df.columns,"polygon df columns")
-        
         df['areacheck'] = df.geom.area
         mean_area = df.areacheck.mean()
         if mean_area <= 0:
@@ -300,19 +302,23 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
             exp_df = polygonExposure(df, haz, expid, Ear_Table_PK)
     # point exposure
     elif(geometrytype == 'Point' or geometrytype == 'MultiPoint'):
-        print(df.columns,"point df columns")
-        
         exp_df = pointExposure(df, haz, expid, Ear_Table_PK)
 
     # line exposure
     elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
-        print(df.columns,"line df columns")
         exp_df = lineExposure(df, haz, expid, Ear_Table_PK)
         
     haz = None
     assert not exp_df.empty, f"The aggregated dataframe in exposure returned empty, this error may arise if input shapes do not overlap raster"
-    df = pd.merge(left=exp_df, right=df, left_on='geom_id',
-                  right_on=Ear_Table_PK, right_index=False)
+    
+    if (geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
+    
+        df = pd.merge(left=exp_df, right=df, left_on=['geom_id','areaOrLength'],
+                    right_on=[Ear_Table_PK,'areaOrLength'], right_index=False)
+    else:
+        df = pd.merge(left=exp_df, right=df, left_on='geom_id',
+                    right_on=Ear_Table_PK, right_index=False)
+    
     df = gpd.GeoDataFrame(df)
     # df = gpd.GeoDataFrame(df, geometry='geom')
     
