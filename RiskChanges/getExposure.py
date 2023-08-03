@@ -57,8 +57,8 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         # exposure['class'].replace(convert_dict, inplace=True)
         
         # if column is count just count the number of feature exposed
-        if column == 'count':
-            exposure[column] = 1
+        # if column == 'count':
+        #     exposure[column] = 1
             
         if not agg:
             summary = pd.pivot_table(exposure, values=column, index=[type_col],
@@ -114,8 +114,8 @@ def getShapefile(con, exposureid, column='areaOrLen', agg=False):
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result}")
         
         # if column is count just count the number of feature exposed
-        if column == 'count':
-            exposure[column] = 1
+        # if column == 'count':
+        #     exposure[column] = 1
         if not agg:
             summary = pd.pivot_table(exposure, values=column, index=['geom_id'],
                                     columns=["class"], aggfunc=np.sum, fill_value=0)
@@ -170,6 +170,8 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
             aggcolumn = popcol
         elif column == 'value_exposure':
             aggcolumn = costcol
+        elif column == 'count':
+            aggcolumn = "count"
         else:
             aggcolumn = 'areaOrLength'
         
@@ -178,9 +180,6 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
             exposure=add_hazard_class_result
         else:
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result}")
-        # if column is count just count the number of feature exposed
-        if column == 'count':
-            exposure[column] = 1
         if not agg:
             summary = pd.pivot_table(exposure, values=column, index=[type_col],
                                     columns=["class"], aggfunc=np.sum, fill_value=0)
@@ -192,6 +191,7 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
             
             summary = summary.reset_index()
             summary = summary.rename(columns={type_col: "Ear Class"})
+            
         else:
             summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
                                     columns=["class"], aggfunc=np.sum, fill_value=0)
@@ -246,6 +246,8 @@ def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
             aggcolumn = popcol
         elif column == 'value_exposure':
             aggcolumn = costcol
+        elif column == 'count':
+            aggcolumn = "count"
         else:
             aggcolumn = 'areaOrLength'
         response,add_hazard_class_result,hazard_class_dict==add_hazard_class(exposure,min_thresholds,classificationScheme)
@@ -258,8 +260,8 @@ def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
         else:
             exposure=add_hazard_class_result
         # if column is count just count the number of feature exposed
-        if column == 'count':
-            exposure[column] = 1
+        # if column == 'count':
+        #     exposure[column] = 1
 
         if not agg:
             # this is always relative
