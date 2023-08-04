@@ -107,7 +107,7 @@ def getShapefile(con, exposureid, column='areaOrLen', agg=False):
         adminid = metadata['adminid']
         earpk = metadata["earPK"]
         earid = metadata['earID']
-        response,add_hazard_class_result,hazard_class_dict==add_hazard_class(exposure,min_thresholds,classificationScheme)
+        response,add_hazard_class_result,hazard_class_dict=add_hazard_class(exposure,min_thresholds,classificationScheme)
         if response:
             exposure=add_hazard_class_result
         else:
@@ -171,13 +171,14 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
         elif column == 'value_exposure':
             aggcolumn = costcol
         elif column == 'count':
-            aggcolumn = "count"
+            aggcolumn = "default_count"
         else:
             aggcolumn = 'areaOrLength'
         
         response,add_hazard_class_result,hazard_class_dict=add_hazard_class(exposure,min_thresholds,classificationScheme)
         if response:
             exposure=add_hazard_class_result
+            exposure['default_count']=1
         else:
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result}")
         if not agg:
@@ -188,10 +189,8 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
                             left_on=type_col, right_on=type_col)
             summary[summary.columns.difference([aggcolumn])] = summary[summary.columns.difference([
                 aggcolumn])].div(summary[aggcolumn], axis=0)*100
-            
             summary = summary.reset_index()
             summary = summary.rename(columns={type_col: "Ear Class"})
-            
         else:
             summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
                                     columns=["class"], aggfunc=np.sum, fill_value=0)
@@ -208,9 +207,8 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
         #to drop column 0.0 if exists
         if 0.0 in summary.columns:
             summary = summary.drop(0.0, axis=1)
-        if 'areaOrLength' in summary.columns:
-            summary = summary.drop('areaOrLength', axis=1)
-            
+        # if 'areaOrLength' in summary.columns:
+        #     summary = summary.drop('areaOrLength', axis=1)
         #Add missing hazard class in table
         for values in hazard_class_dict.values():
             if values not in summary.columns:
@@ -247,12 +245,13 @@ def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
         elif column == 'value_exposure':
             aggcolumn = costcol
         elif column == 'count':
-            aggcolumn = "count"
+            aggcolumn = "default_count"
         else:
             aggcolumn = 'areaOrLength'
-        response,add_hazard_class_result,hazard_class_dict==add_hazard_class(exposure,min_thresholds,classificationScheme)
+        response,add_hazard_class_result,hazard_class_dict=add_hazard_class(exposure,min_thresholds,classificationScheme)
         if response:
             exposure=add_hazard_class_result
+            exposure['default_count']=1
         else:
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result}")
         if isinstance(add_hazard_class_result,dict):
@@ -289,8 +288,8 @@ def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
         #to drop column 0.0 if exists
         if 0.0 in summary.columns:
             summary = summary.drop(0.0, axis=1)
-        if 'areaOrLength' in summary.columns:
-            summary = summary.drop('areaOrLength', axis=1)
+        # if 'areaOrLength' in summary.columns:
+        #     summary = summary.drop('areaOrLength', axis=1)
         #Add missing hazard class in table
         for values in hazard_class_dict.values():
             if values not in summary.columns:
