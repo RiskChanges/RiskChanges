@@ -13,14 +13,18 @@ def writeexposure(df, connstr, schema):
         #     connection.execute('''ALTER TABLE "{0}"."exposure_result" RENAME COLUMN "areaOrLen_exposure" TO "areaOrLen"'''.format(schema))
         # except:
         #     pass
-        connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
-                    "exposure_result", 'value_exposure_rel', 'float', schema))
-        connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
-                    "exposure_result", 'population_exposure_rel', 'float', schema))
-        connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
-                "exposure_result", 'count', 'float', schema))
-        connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
-                "exposure_result", 'count_rel', 'float', schema))
+        try:
+            connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
+                        "exposure_result", 'value_exposure_rel', 'float', schema))
+            connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
+                        "exposure_result", 'population_exposure_rel', 'float', schema))
+            connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
+                    "exposure_result", 'count', 'float', schema))
+            connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
+                    "exposure_result", 'count_rel', 'float', schema))
+        except Exception as e:
+            #if exposure_result table does not exists
+            print(str(e))
     df.to_sql('exposure_result', engine, schema,
               if_exists='append', index=False)
     print('data written')
