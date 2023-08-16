@@ -5,20 +5,21 @@ import logging
 logger = logging.getLogger(__file__)
 
 #! mention all default column in exposure, loss and risk result
-def loadshp(shpInput, engine, lyrName, schema, index,calcAreaOrLen=False):
+def loadshp(shpInput, engine, lyrName, schema, index,calcAreaOrLen=False,shp_gdf=geopandas.GeoDataFrame()):
     default_columns=['exposed','exp_id','areaOrLen','value_exposure','value_exposure_rel','population_exposure','population_exposure_rel']
     try:
-        gdf = geopandas.read_file(shpInput)
+        if shp_gdf.empty:
+            gdf = geopandas.read_file(shpInput)
+        else:
+            gdf=shp_gdf
         gdf = gdf[gdf.is_valid]
         gdf[index] = gdf.index
         df_columns=gdf.columns
-
-        logger.info(f"{df_columns} df columns")
+        
         for col in default_columns:
             if col in df_columns:
                 random_number = random.randint(10, 99)
                 gdf.rename(columns={col: f'{col}_{random_number}'}, inplace=True)
-
         gdf.to_postgis(name=lyrName, con=engine,
                                 schema=schema, if_exists='replace')
         
@@ -35,6 +36,6 @@ def loadshp(shpInput, engine, lyrName, schema, index,calcAreaOrLen=False):
                 else:
                     return {"error":f"Invalid geometrytype {geometrytype}"}  
         # engine.dispose()
-        return "successful"
+        return True, "successful"
     except Exception as e:
-        return {"error":str(e)}
+        return False, str(e)
