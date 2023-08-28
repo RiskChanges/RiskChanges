@@ -131,6 +131,13 @@ def ComputeLoss(con, exposureid, lossid, computecol='counts', **kwargs):
             loss, admin_unit, adminpk, admin_dataid)
         loss = loss.rename(
             columns={adminpk: 'admin_id', admin_dataid: "geom_id"})
+        #merging the data to include all admin unit
+        loss= pd.merge(left=loss, right=admin_unit[[adminpk,
+                        admin_dataid]], left_on='geom_id', right_on=admin_dataid, right_index=False, how="right")
+        loss=loss.drop(columns= ['geom_id','admin_id'])
+        loss = loss.rename(
+            columns={admin_dataid: "geom_id",adminpk:"admin_id"})
+        loss=loss.fillna(0)
         assert not loss.empty, f"The aggregated dataframe in loss returned empty"
 
     # Non aggrigated case
