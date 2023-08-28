@@ -446,8 +446,14 @@ def computeMulRisk(connstr, groupcombinations, extensions, riskid, **kwargs):
         risk = aggregator.aggregaterisk(risk, admin_unit, adminpk,admin_dataid)
         risk = risk.rename(
             columns={adminpk: 'admin_id', admin_dataid: "geom_id"})
-        # risk = risk.rename(
-        #     columns={adminpk: 'admin_id', admin_dataid: "geom_id"})
+            
+        #merging the data to include all admin unit
+        risk= pd.merge(left=risk, right=admin_unit[[adminpk,
+                        admin_dataid]], left_on='geom_id', right_on=admin_dataid, right_index=False, how="right")
+        risk=risk.drop(columns= ['geom_id','admin_id'])
+        risk = risk.rename(
+            columns={admin_dataid: "geom_id",adminpk:"admin_id"})
+        risk=risk.fillna(0)
         assert not risk.empty, f"The aggregated dataframe in risk returned empty"
     else:
         risk['admin_id'] = ''
