@@ -8,6 +8,13 @@ from .RiskChangesOps.readraster import readhaz
 from .RiskChangesOps.readvector import readear, readAdmin
 from .RiskChangesOps import readmeta
 from sqlalchemy import create_engine
+from rasterio.io import MemoryFile
+import rasterio
+from rasterio.enums import Resampling
+# from rasterio.coords import disjoint_bounds
+# from rasterio.transform import from_origin
+# from rasterio.windows import Window
+# from collections import Counter
 
 def polygonExposure(ear, haz, expid, Ear_Table_PK):
     df = pd.DataFrame()
@@ -401,3 +408,157 @@ len_ras = zoneraster.count()
 assert vectorops.cehckprojection(
    ear, haz), "The hazard and EAR do not have same projection system please check it first"
 ''' 
+
+def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
+    try:
+        metatable = readmeta.earmeta(con, earid)
+        schema = metatable.workspace[0]
+        adminid = kwargs.get('adminunit_id', None)
+        haz_file = kwargs.get('haz_file', None)
+        ear_file = kwargs.get('ear_file', None)
+
+        hazard_raster = readhaz(con, hazid, haz_file)
+        ear_raster = rasterio.open(ear_file) #handle this
+
+        final_x_res=int(ear_raster.res[0])
+        final_y_res=int(ear_raster.res[1])
+        resampled_haz_width=int((hazard_raster.width * hazard_raster.res[0]) / final_x_res)
+        resampled_haz_height=int((hazard_raster.height * hazard_raster.res[1]) / final_y_res)
+        resampled_ear_width=int((ear_raster.width * ear_raster.res[0]) / final_x_res)
+        resampled_ear_height=int((ear_raster.height * ear_raster.res[1]) / final_y_res)
+        
+        # Resample the source raster to match the target resolution
+        resampled_haz_data = hazard_raster.read(
+            out_shape=(hazard_raster.count, resampled_haz_height, resampled_haz_width),
+            resampling=Resampling.nearest
+        )
+        resampled_ear_data = ear_raster.read(
+            out_shape=(ear_raster.count, resampled_ear_height, resampled_ear_width),
+            resampling=Resampling.nearest
+        )
+        
+        # Get x and y origin based on the original transformation
+        haz_x_origin, haz_y_origin = hazard_raster.transform[2],hazard_raster.transform[5] 
+        ear_x_origin, ear_y_origin = ear_raster.transform[2],ear_raster.transform[5] 
+
+        # Create a new Affine transformation with the updated pixel dimensions
+        new_haz_transform = rasterio.transform.Affine(final_x_res,0.0, haz_x_origin,0.0,-final_y_res, haz_y_origin)
+        new_ear_transform = rasterio.transform.Affine(final_x_res,0.0, ear_x_origin,0.0,-final_y_res, ear_y_origin)
+
+        resampled_haz_meta = {
+            'driver': 'GTiff',
+            'dtype': resampled_haz_data.dtype,
+            'count': 1,  # Number of bands
+            'height': resampled_haz_height,
+            'width': resampled_haz_width,
+            'crs': hazard_raster.crs,  # Replace with your desired CRS
+            'transform': new_haz_transform
+        }
+        resampled_ear_meta = {
+            'driver': 'GTiff',
+            'dtype': resampled_ear_data.dtype,
+            'count': 1,  # Number of bands
+            'height': resampled_ear_height,
+            'width': resampled_ear_width,
+            'crs': ear_raster.crs,  # Replace with your desired CRS
+            'transform': new_ear_transform
+        }
+
+        with MemoryFile() as memfile:
+            with memfile.open(**resampled_haz_meta) as dst:
+                dst.write(resampled_haz_data)
+            resampled_hazard_raster = memfile.open()
+            
+        with MemoryFile() as memfile:
+            with memfile.open(**resampled_ear_meta) as dst:
+                dst.write(resampled_ear_data)
+            resampled_ear_raster = memfile.open()
+
+        hazard_raster_data = resampled_hazard_raster.read(1)  # Read the first band of raster 1
+        ear_raster_data = resampled_ear_raster.read(1)  # Read the first band of raster 2
+
+        hazard_bounds = resampled_hazard_raster.bounds #Get the extent of hazard dataset
+        ear_bounds = resampled_ear_raster.bounds #Get the extent of hazard dataset
+        
+        # Calculate intersection bounds
+        intersection_bounds = (
+            max(ear_bounds.left, hazard_bounds.left),
+            max(ear_bounds.bottom, hazard_bounds.bottom),
+            min(ear_bounds.right, hazard_bounds.right),
+            min(ear_bounds.top, hazard_bounds.top)
+        )
+        
+        hazard_window = resampled_hazard_raster.window(*intersection_bounds)
+        hazard_row_off,hazard_col_off = int(hazard_window.row_off), int(hazard_window.col_off)
+        hazard_height,hazard_width = int(hazard_window.height), int(hazard_window.width)
+
+        ear_window = resampled_ear_raster.window(*intersection_bounds)
+        ear_row_off, ear_col_off = int(ear_window.row_off), int(ear_window.col_off)
+        ear_height,ear_width  = int(ear_window.height), int(ear_window.width)
+        
+        clipped_hazard_raster = hazard_raster_data[hazard_row_off:(hazard_row_off + hazard_height), hazard_col_off:(hazard_col_off + hazard_width)]
+        clipped_ear_raster = ear_raster_data[ear_row_off:(ear_row_off + ear_height), ear_col_off:(ear_col_off + ear_width)]
+
+        ear_x_origin = resampled_ear_raster.transform[2]+(ear_col_off*final_x_res)
+        ear_y_origin = resampled_ear_raster.transform[5]+(ear_row_off*final_y_res)
+
+        hazard_x_origin = resampled_hazard_raster.transform[2]+(hazard_col_off*final_x_res)
+        hazard_y_origin = resampled_hazard_raster.transform[5]+(hazard_row_off*final_y_res)
+
+        #handeling nodata and nan value in hazard datasets
+        has_nodata = np.isnan(clipped_hazard_raster).any()  
+        if has_nodata:
+            clipped_hazard_raster = np.nan_to_num(clipped_hazard_raster, nan=0.0)
+        nodata = resampled_hazard_raster.nodata
+        clipped_hazard_raster[clipped_hazard_raster == nodata]=0.0
+        clipped_hazard_raster = clipped_hazard_raster[clipped_hazard_raster != nodata] 
+        
+        #handeling nodata and nan value in ear datasets
+        has_nodata = np.isnan(clipped_ear_raster).any()  
+        if has_nodata:
+            clipped_ear_raster = np.nan_to_num(clipped_ear_raster, nan=0.0)
+        nodata = resampled_ear_raster.nodata
+        clipped_ear_raster[clipped_ear_raster == nodata]=0.0
+        clipped_ear_raster = clipped_ear_raster[clipped_ear_raster != nodata] 
+        
+        #Get unique pixel value in hazard and ear datasets
+        unique_ear_pixel_values=np.unique(clipped_ear_raster)
+        unique_hazard_pixel_values=np.unique(clipped_hazard_raster)
+        
+        # pivot_data = pd.DataFrame(index=unique_ear_pixel_values, columns=unique_hazard_pixel_values, dtype=int)
+        # # print("pivot data")
+        # # # Fill the pivot table with counts
+        # for hazard_value in unique_hazard_pixel_values:
+        #     print(hazard_value,"hazard_value")
+        #     for ear_value in unique_ear_pixel_values:
+        #         count = np.sum((clipped_hazard_raster == hazard_value) & (clipped_ear_raster == ear_value))
+        #         pivot_data.at[ear_value, hazard_value] = count
+        # print(pivot_data)
+        
+        #create empty dataframe
+        df = pd.DataFrame(columns=["hazard_name", "ear_name", "total_pixel_exposed","total_area_exposed","relative_exposed"])
+        total_pixel_count=ear_height*ear_width
+        
+        for hazard_value in unique_hazard_pixel_values:
+            for ear_value in unique_ear_pixel_values:
+                total_pixel_exposed = np.sum((clipped_hazard_raster == hazard_value) & (clipped_ear_raster == ear_value))
+                total_area_exposed=total_pixel_exposed*final_x_res*final_y_res
+                relative_exposed=total_pixel_exposed*100/total_pixel_count
+                df = df.append({
+                        "hazard_name": hazard_value,
+                        "ear_name": ear_value, 
+                        "total_pixel_exposed": total_pixel_exposed,
+                        "total_area_exposed":total_area_exposed,
+                        "relative_exposed":round(relative_exposed,3),
+                        }, ignore_index=True)
+                
+        table_name="raster_exposure_result"
+        df['exposure_id'] = expid
+        df['admin_id'] = None
+        # print(df)
+        writevector.writeexposure(df, con, schema,table_name)
+        print("done")
+    except Exception as e:
+        print("error ",str(e))
+        
+    

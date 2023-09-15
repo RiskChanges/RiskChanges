@@ -4,7 +4,7 @@ import geopandas as gpd
 from sqlalchemy import create_engine
 
 
-def writeexposure(df, connstr, schema):
+def writeexposure(df, connstr, schema,table_name="exposure_result"):
     engine = create_engine(connstr)
     # Execute the raw SQL statement to rename the column and add column value_exposure_rel, population_exposure_rel if not exists
     #! this is not required if updated existing table once
@@ -15,20 +15,19 @@ def writeexposure(df, connstr, schema):
         #     pass
         try:
             connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
-                        "exposure_result", 'value_exposure_rel', 'float', schema))
+                        table_name, 'value_exposure_rel', 'float', schema))
             connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
-                        "exposure_result", 'population_exposure_rel', 'float', schema))
+                        table_name, 'population_exposure_rel', 'float', schema))
             connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
-                    "exposure_result", 'count', 'float', schema))
+                    table_name, 'count', 'float', schema))
             connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
-                    "exposure_result", 'count_rel', 'float', schema))
+                    table_name, 'count_rel', 'float', schema))
         except Exception as e:
             #if exposure_result table does not exists
             print(str(e))
-    df.to_sql('exposure_result', engine, schema,
+    df.to_sql(table_name, engine, schema,
               if_exists='append', index=False)
     print('data written')
-
     engine.dispose()
 
 
