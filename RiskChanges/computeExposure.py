@@ -592,12 +592,12 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
                 unique_ear_pixel_values=np.unique(masked_ear_raster_data)
                 unique_hazard_pixel_values=np.unique(masked_hazard_raster_data)
                 
-                print(unique_ear_pixel_values,"unique_ear_pixel_values")
-                print(unique_hazard_pixel_values,"unique_hazard_pixel_values")
+                # print(unique_ear_pixel_values,"unique_ear_pixel_values")
+                # print(unique_hazard_pixel_values,"unique_hazard_pixel_values")
                 
                 ear_data_shape = masked_ear_raster_data.shape
                 hazard_data_shape = masked_hazard_raster_data.shape
-                print(ear_data_shape,hazard_data_shape,"shapes")
+                # print(ear_data_shape,hazard_data_shape,"shapes")
                 
                 if ear_data_shape != hazard_data_shape:
                     # Ensure array shapes match along the second dimension
@@ -624,7 +624,7 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
                         diff = ear_data_shape[2] -  hazard_data_shape[2]
                         padding = [(0, 0), (0, 0), (0, diff)]  # Pad along the second dimension
                         masked_hazard_raster_data = np.pad(masked_hazard_raster_data, padding, mode='constant', constant_values=0)
-                print(masked_hazard_raster_data.shape,masked_ear_raster_data.shape,"shapes")
+                # print(masked_hazard_raster_data.shape,masked_ear_raster_data.shape,"shapes")
                 
                 # if ear_data_shape != hazard_data_shape:
                 #     # Assuming the mismatched dimension is the second dimension (847 vs. 848)
@@ -634,7 +634,7 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
                 #     else:
                 #         # Reshape masked_hazard_raster_data to match ear_data_shape
                 #         masked_hazard_raster_data =np.broadcast_to(masked_hazard_raster_data, ear_data_shape)
-                print(masked_ear_raster_data.shape,masked_hazard_raster_data.shape,"shapes")
+                # print(masked_ear_raster_data.shape,masked_hazard_raster_data.shape,"shapes")
                 
                 for hazard_value in unique_hazard_pixel_values:
                     for ear_value in unique_ear_pixel_values:
@@ -654,7 +654,7 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
         else:
             df = pd.DataFrame(columns=["hazard_name", "ear_name", "total_pixel_exposed","total_area_exposed","relative_exposed"])
              
-            print("1234589")
+            # print("1234589")
             #handeling nodata and nan value in hazard datasets
             has_nodata = np.isnan(clipped_hazard_raster_data).any()  
             if has_nodata:
@@ -670,7 +670,7 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
             nodata = resampled_ear_raster.nodata
             clipped_ear_raster_data[clipped_ear_raster_data == nodata]=0.0
             clipped_ear_raster_data = clipped_ear_raster_data[clipped_ear_raster_data != nodata] 
-            print("12345101112")
+            # print("12345101112")
             
             #Get unique pixel value in hazard and ear datasets
             unique_ear_pixel_values=np.unique(clipped_ear_raster_data)
