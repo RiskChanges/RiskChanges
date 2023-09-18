@@ -6,10 +6,35 @@ import pandas as pd
 import numpy as np
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
+def find_duplicates(arr):
+    rounded_array_list=[round(num, 6) for num in arr]
+    duplicates = []
+    indices = {}
+    for i, value in enumerate(rounded_array_list):
+        if value in indices:
+            if value not in duplicates:
+                duplicates.append(value)
+            indices[value].append(i)
+        else:
+            indices[value] = [i]
+    return duplicates, indices
+
 
 def dutch_method(xx, yy):
     # compute risk based on dutch method where xx is value axis and yy is probability axis
-    args = np.argsort(np.array(xx,dtype=np.float32))
+    print(xx,"xxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+    duplicates, indices = find_duplicates(xx)
+    print(duplicates,"duplicates")
+    print(indices,"indices")
+    if len(duplicates)>0:
+        for key in indices.keys():
+            if key!=0 and len(indices[key])>1:
+                increment=0.0001
+                for i in indices[key]:
+                    xx[i]=xx[i]+increment if xx[i]+increment not in xx else xx[i]
+                    increment=increment+0.0001
+                
+    args = np.argsort(np.array(xx,dtype=np.float64))
     xx = [xx[i] for i in args]
     yy = [yy[i] for i in args]
     AAL = auc(x=xx, y=yy)+(xx[0]*yy[0])

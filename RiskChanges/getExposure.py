@@ -5,9 +5,12 @@ import numpy as np
 from .RiskChangesOps.readvulnerability import readIntVuln, readSusVuln
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
+# import logging
+# logger = logging.getLogger(__file__)
+
+#! create function for similar calculation
 
 def getSummary(con, exposureid, column='areaOrLen', agg=False):
-
     if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
         raise ValueError(
             "column: status must be one of areaOrLen, value_exposure or population_exposure")
@@ -15,37 +18,40 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
     exposure = readvector.prepareExposureForLoss(con, exposureid)
     hazid = metadata['hazid']
     classificationScheme = readmeta.classificationscheme(con, hazid)
-    base = float(metadata["base"])
-    maxval = float(metadata["threshold"])
+    thresholds=classificationScheme['val1'].unique()
+    thresholds.sort()
+    min_thresholds=[float(val) for val in thresholds]
     type_col = metadata["TypeColumn"]
-    stepsize = float(metadata["stepsize"])
-    min_thresholds = np.arange(
-        start=base, stop=maxval+1, step=stepsize).tolist()
+    
+    # base = float(metadata["base"])
+    # maxval = float(metadata["threshold"])
+    # stepsize = float(metadata["stepsize"])
+    # min_thresholds = np.arange(
+    #     start=base, stop=maxval, step=stepsize).tolist()
+    
     convert_dict = {}
     for i, val in enumerate(min_thresholds):
-
         # the default type for val1 is char, change it to float and compare
         classificationScheme['val1'] = classificationScheme['val1'].astype(
             float)
         name = classificationScheme.query(f'val1 == {val}')
-
         # not every hazard class are avialable on exposure table
         # so try except to pass even the class is not available
         try:
             name = name['class_name'].to_list()[0]
             convert_dict[i+1] = name
-
-        except:
+        except Exception as e:
+            print(str(e),"Error in getSummary")
+            # logger.info(f"{str(e)} Error in getSummary")
             pass
-
         # if it is last class, then need to assign max class for all result
         if (val == min_thresholds[-1]):
             exposure['class'] = np.where(
-                exposure['class'] >= i, i, exposure['class'])
-
+                exposure['class'] >= i+1, i+1, exposure['class'])
+            
     # Change the classes to the user defined class
     exposure['class'].replace(convert_dict, inplace=True)
-
+    
     # if column is count just count the number of feature exposed
     if column == 'count':
         exposure[column] = 1
@@ -61,6 +67,10 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         summary = summary.reset_index()
         summary = summary.rename(
             columns={type_col: "Ear Class", "admin_id": "Admin Name"})
+    summary = summary.fillna(0)
+    #to drop column 0.0 if exists
+    if 0.0 in summary.columns:
+        summary = summary.drop(0.0, axis=1)
     return summary
 
 
@@ -71,17 +81,23 @@ def getShapefile(con, exposureid, column='exposed', agg=False):
     metadata = readmeta.computeloss_meta(con, exposureid)
     exposure = readvector.prepareExposureForLoss(con, exposureid)
     hazid = metadata["hazid"]
+    
     classificationScheme = readmeta.classificationscheme(con, hazid)
-    base = float(metadata["base"])
-    maxval = float(metadata["threshold"])
+    thresholds=classificationScheme['val1'].unique()
+    thresholds.sort()
+    min_thresholds=[float(val) for val in thresholds]
+    
+    # base = float(metadata["base"])
+    # maxval = float(metadata["threshold"])
     type_col = metadata["TypeColumn"]
     adminid = metadata['adminid']
     earpk = metadata["earPK"]
     earid = metadata['earID']
     earid = metadata['earID']
-    stepsize = float(metadata["stepsize"])
-    min_thresholds = np.arange(
-        start=base, stop=maxval+1, step=stepsize).tolist()
+    # stepsize = float(metadata["stepsize"])
+    
+    # min_thresholds = np.arange(
+    #     start=base, stop=maxval+1, step=stepsize).tolist()
     convert_dict = {}
     for i, val in enumerate(min_thresholds):
 
@@ -102,7 +118,7 @@ def getShapefile(con, exposureid, column='exposed', agg=False):
         # if it is last class, then need to assign max class for all result
         if (val == min_thresholds[-1]):
             exposure['class'] = np.where(
-                exposure['class'] >= i, i, exposure['class'])
+                exposure['class'] >= i+1, i+1, exposure['class'])
 
     # Change the classes to the user defined class
     exposure["class"].replace(convert_dict, inplace=True)
@@ -127,14 +143,16 @@ def getShapefile(con, exposureid, column='exposed', agg=False):
         summary = pd.merge(left=summary, right=admin,
                            left_on='admin_id', right_on=adminpk, right_index=False)
         summary = gpd.GeoDataFrame(summary, geometry='geom')
-
+    summary = summary.fillna(0)
+    #to drop column 0.0 if exists
+    if 0.0 in summary.columns:
+        summary = summary.drop(0.0, axis=1)
     return summary
 
    # **********************BELOW FUNCTIONS ARE FOR RELATIVE VALUES, ***************************
 
 
 def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
-
     if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
         raise ValueError(
             "column: status must be one of areaOrLen, value_exposure or population_exposure")
@@ -142,14 +160,18 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
     exposure = readvector.prepareExposureForLoss(con, exposureid)
     hazid = metadata['hazid']
     classificationScheme = readmeta.classificationscheme(con, hazid)
+    thresholds=classificationScheme['val1'].unique()
+    thresholds.sort()
+    min_thresholds=[float(val) for val in thresholds]
+    
     costcol = metadata['costColumn']
     popcol = metadata['populColumn']
-    base = float(metadata["base"])
-    maxval = float(metadata["threshold"])
+    # base = float(metadata["base"])
+    # maxval = float(metadata["threshold"])
     type_col = metadata["TypeColumn"]
-    stepsize = float(metadata["stepsize"])
-    min_thresholds = np.arange(
-        start=base, stop=maxval+1, step=stepsize).tolist()
+    # stepsize = float(metadata["stepsize"])
+    # min_thresholds = np.arange(
+    #     start=base, stop=maxval+1, step=stepsize).tolist()
     convert_dict = {}
     if column == 'population_exposure':
         aggcolumn = popcol
@@ -169,14 +191,13 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
         try:
             name = name['class_name'].to_list()[0]
             convert_dict[i+1] = name
-
         except:
             pass
 
         # if it is last class, then need to assign max class for all result
         if (val == min_thresholds[-1]):
             exposure['class'] = np.where(
-                exposure['class'] >= i, i, exposure['class'])
+                exposure['class'] >= i+1, i+1, exposure['class'])
 
     # Change the classes to the user defined class
     exposure['class'].replace(convert_dict, inplace=True)
@@ -193,7 +214,6 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
                            left_on=type_col, right_on=type_col)
         summary[summary.columns.difference([aggcolumn])] = summary[summary.columns.difference([
             aggcolumn])].div(summary[aggcolumn], axis=0)*100
-
         summary = summary.reset_index()
         summary = summary.rename(columns={type_col: "Ear Class"})
 
@@ -209,6 +229,10 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
         summary = summary.reset_index()
         summary = summary.rename(
             columns={type_col: "Ear Class", "admin_id": "Admin Name"})
+    summary = summary.fillna(0)
+    #to drop column 0.0 if exists
+    if 0.0 in summary.columns:
+        summary = summary.drop(0.0, axis=1)
     return summary
 
 
@@ -220,16 +244,20 @@ def getShapefileRel(con, exposureid, column='exposed', agg=False):
     exposure = readvector.prepareExposureForLoss(con, exposureid)
     hazid = metadata["hazid"]
     classificationScheme = readmeta.classificationscheme(con, hazid)
-    base = float(metadata["base"])
-    maxval = float(metadata["threshold"])
+    thresholds=classificationScheme['val1'].unique()
+    thresholds.sort()
+    min_thresholds=[float(val) for val in thresholds]
+    
+    # base = float(metadata["base"])
+    # maxval = float(metadata["threshold"])
     type_col = metadata["TypeColumn"]
     adminid = metadata['adminid']
     earpk = metadata["earPK"]
     earid = metadata['earID']
     earid = metadata['earID']
-    stepsize = float(metadata["stepsize"])
-    min_thresholds = np.arange(
-        start=base, stop=maxval+1, step=stepsize).tolist()
+    # stepsize = float(metadata["stepsize"])
+    # min_thresholds = np.arange(
+    #     start=base, stop=maxval+1, step=stepsize).tolist()
     convert_dict = {}
     costcol = metadata['costColumn']
     popcol = metadata['populColumn']
@@ -258,7 +286,7 @@ def getShapefileRel(con, exposureid, column='exposed', agg=False):
         # if it is last class, then need to assign max class for all result
         if (val == min_thresholds[-1]):
             exposure['class'] = np.where(
-                exposure['class'] >= i, i, exposure['class'])
+                exposure['class'] >= i+1, i+1, exposure['class'])
 
     # Change the classes to the user defined class
     exposure["class"].replace(convert_dict, inplace=True)
@@ -289,5 +317,8 @@ def getShapefileRel(con, exposureid, column='exposed', agg=False):
         summary = pd.merge(left=summary, right=admin,
                            left_on='admin_id', right_on=adminpk, right_index=False)
         summary = gpd.GeoDataFrame(summary, geometry='geom')
-
+    summary = summary.fillna(0)
+    #to drop column 0.0 if exists
+    if 0.0 in summary.columns:
+        summary = summary.drop(0.0, axis=1)
     return summary

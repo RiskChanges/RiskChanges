@@ -10,25 +10,42 @@ from .RiskChangesOps import readmeta
 
 
 def polygonExposure(ear, haz, expid, Ear_Table_PK):
+    # print(ear,"ear")
+    # print(haz,"haz")
+    # print(expid,"expid")
+    # print(Ear_Table_PK,"Ear_Table_PK")
+
     df = pd.DataFrame()
     for ind, row in ear.iterrows():
         # print(row)
         # rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
         try:
-            maska, transform = rasterops.cropraster(haz, [row.geom])
+            maska, transform,len_ras = rasterops.cropraster(haz, [row.geom])
         except:
+            print("could not cropraster")
             continue
+        '''
+        This code line creates a masked array using the masked_array() function from the numpy.ma module. 
+        The masked_array() function takes two arguments: 
+        the first argument (maska) is the original array or raster, and 
+        The second argument is the mask array, which indicates which elements in the original array should be masked (hidden) from computations
+        The mask is set to maska == 0, which means that all elements in maska with a value of zero (which are likely to be nodata values) will be masked out. This effectively removes nodata values from the computation of any statistics or analyses performed on zoneraster.
+        '''
         zoneraster = ma.masked_array(maska, mask=maska == 0)
-        len_ras = zoneraster.count()
-        # print(len_ras)
+        # len_ras = zoneraster.count()
+        # print(len_ras,zoneraster.count(),"len_ras")
+        
         if len_ras == 0:
+            print("length of raster zero")
             continue
 
         unique, counts = np.unique(zoneraster, return_counts=True)
+        '''
+        The index of the zero value is identified using the where() function from the numpy module, and that index is used to delete the corresponding elements in both the ids and cus arrays using the delete()
+        '''
         if ma.is_masked(unique):
             unique = unique.filled(0)
             idx = np.where(unique == 0)[0][0]
-            # print(idx)
             ids = np.delete(unique, idx)
             cus = np.delete(counts, idx)
         else:
@@ -39,16 +56,25 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
             ids = np.delete(ids, idx)
             cus = np.delete(cus, idx)
         if len(ids) == 0:
-            # print(len(ids))
-            # break
+            print("len of ids zero")
+            # df_temp = pd.DataFrame(np.asarray(('', 0)), columns=['class', 'exposed'])
+            df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
+            df_temp['geom_id'] = row[Ear_Table_PK]
+            df_temp['areaOrLen'] = row.geom.area
+            df_temp['exposure_id'] = expid
+            df = df.append(df_temp, ignore_index=True)
             continue
         elif np.max(ids) == 0:
+            print("np max ids zero")
+            df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
+            df_temp['geom_id'] = row[Ear_Table_PK]
+            df_temp['areaOrLen'] = row.geom.area
+            df_temp['exposure_id'] = expid
+            df = df.append(df_temp, ignore_index=True)
             continue
-
         frequencies = np.asarray((ids, cus)).T
         for i in range(len(frequencies)):
             frequencies[i][1] = (frequencies[i][1]/len_ras)*100
-        # print(frequencies)
         df_temp = pd.DataFrame(frequencies, columns=['class', 'exposed'])
         df_temp['geom_id'] = row[Ear_Table_PK]
         df_temp['areaOrLen'] = row.geom.area
@@ -69,11 +95,12 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
         polygon = row.geom.buffer(buffersize)
         # rasterio.mask.mask(haz, [row.geometry], crop=True,nodata=0,all_touched=True)
         try:
-            maska, transform = rasterops.cropraster(haz, [polygon])
+            # maska, transform = rasterops.cropraster(haz, [polygon])
+            maska, transform,len_ras = rasterops.cropraster(haz, [polygon])
         except:
             continue
         zoneraster = ma.masked_array(maska, mask=maska == 0)
-        len_ras = zoneraster.count()
+        # len_ras = zoneraster.count()
         # print(len_ras)
         if len_ras == 0:
             continue
@@ -93,10 +120,18 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
             ids = np.delete(ids, idx)
             cus = np.delete(cus, idx)
         if len(ids) == 0:
-            # print(len(ids))
-            # break
+            df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
+            df_temp['geom_id'] = row[Ear_Table_PK]
+            df_temp['areaOrLen'] = row.geom.length
+            df_temp['exposure_id'] = expid
+            df = df.append(df_temp, ignore_index=True)
             continue
         elif np.max(ids) == 0:
+            df_temp = pd.DataFrame([[0,0]], columns=['class', 'exposed'])
+            df_temp['geom_id'] = row[Ear_Table_PK]
+            df_temp['areaOrLen'] = row.geom.length
+            df_temp['exposure_id'] = expid
+            df = df.append(df_temp, ignore_index=True)
             continue
 
         frequencies = np.asarray((ids, cus)).T
@@ -184,9 +219,11 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         ear['areacheck'] = ear.geom.area
         mean_area = ear.areacheck.mean()
         if mean_area <= 0:
+            print("mean area less than zero")
             ear['geom'] = ear['geom'].centroid
             df = pointExposure(ear, haz, expid, Ear_Table_PK)
         else:
+            print("call to polygon exposure")
             df = polygonExposure(ear, haz, expid, Ear_Table_PK)
     # point exposure
     elif(geometrytype == 'Point' or geometrytype == 'MultiPoint'):
@@ -196,10 +233,9 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     elif(geometrytype == 'LineString' or geometrytype == 'MultiLineString'):
         df = lineExposure(ear, haz, expid, Ear_Table_PK)
     haz = None
-
+    assert not df.empty, f"The aggregated dataframe in exposure returned empty, this error may arise if input shapes do not overlap raster"
     df = pd.merge(left=df, right=ear, left_on='geom_id',
                   right_on=Ear_Table_PK, right_index=False)
-    assert not df.empty, f"The aggregated dataframe in exposure returned empty"
     df = gpd.GeoDataFrame(df, geometry='geom')
     # if not onlyaggregated: #due to change of 24 may 2022, it is redundant now because of else statement in coming condition.
     #     df['exposure_id'] = expid
@@ -224,7 +260,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     else:
         df['admin_id'] = ''
 
-    print('default_columns', default_cols)
+    # print('default_columns', default_cols)
     df = df[default_cols]
     df['exposure_id'] = expid
 
@@ -241,6 +277,8 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     df['areaOrLen'] = df['exposed'] * df['areaOrLen']/100
     df['value_exposure'] = df['exposed'] * df['value_exposure']/100
     df['population_exposure'] = df['exposed'] * df['population_exposure']/100
+    # print(df.columns,"columnsssssssssssssssssss")
+    # print(len(df),"length of dataframe")
     writevector.writeexposure(df, con, schema)
 
     # else:
