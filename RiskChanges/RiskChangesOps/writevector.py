@@ -13,18 +13,19 @@ def writeexposure(df, connstr, schema,table_name="exposure_result"):
         #     connection.execute('''ALTER TABLE "{0}"."exposure_result" RENAME COLUMN "areaOrLen_exposure" TO "areaOrLen"'''.format(schema))
         # except:
         #     pass
-        try:
-            connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
-                        table_name, 'value_exposure_rel', 'float', schema))
-            connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
-                        table_name, 'population_exposure_rel', 'float', schema))
-            connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
-                    table_name, 'count', 'float', schema))
-            connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
-                    table_name, 'count_rel', 'float', schema))
-        except Exception as e:
-            #if exposure_result table does not exists
-            print(str(e))
+        if table_name=="exposure_result":
+            try:
+                connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
+                            table_name, 'value_exposure_rel', 'float', schema))
+                connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
+                            table_name, 'population_exposure_rel', 'float', schema))
+                connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
+                        table_name, 'count', 'float', schema))
+                connection.execute('''ALTER TABLE "{3}"."{0}" ADD IF NOT EXISTS "{1}" {2}'''.format(
+                        table_name, 'count_rel', 'float', schema))
+            except Exception as e:
+                #if exposure_result table does not exists
+                print(str(e))
     df.to_sql(table_name, engine, schema,
               if_exists='append', index=False)
     print('data written')
