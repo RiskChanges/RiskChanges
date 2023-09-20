@@ -29,13 +29,15 @@ def reclassify(in_image, out_image, base, stepsize, maxval):
         profile = input_image.profile
         with rasterio.open(out_image, 'w', **profile) as dst:
             dst.write(intensity_data_classified, 1)
-        dst = None
-    input_image = None
+        # dst = None
+    # input_image = None
+    input_image.close()
 
 
 def ClassifyHazard(hazard_file, base, stepsize, threshold):
     infile = hazard_file
-    outfile = hazard_file.replace(".tif", "_reclassified.tif")
+    file_name, file_extension = os.path.splitext(infile)
+    outfile = hazard_file.replace(file_extension, f"_reclassified{file_extension}")
     if os.path.isfile(outfile):
         pass
     else:
