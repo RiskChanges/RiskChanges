@@ -11,6 +11,7 @@ from sqlalchemy import create_engine
 
 def polygonExposure(ear, haz, expid, Ear_Table_PK):
     df = pd.DataFrame()
+    
     for ind, row in ear.iterrows():
         try:
             maska, transform,len_ras = rasterops.cropraster(haz, [row.geom])
@@ -79,7 +80,7 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
     print("*******************1111111111111111111")
     print(Ear_Table_PK,"Ear_Table_PK")
     print("*******************1111111111111111111")
-    
+    haz_data=haz.read(1)
     gt = haz.transform
     buffersize = gt[0]/4
     df = pd.DataFrame()
@@ -129,6 +130,7 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
         for i in range(len(frequencies)):
             frequencies[i][1] = (frequencies[i][1]/len_ras)*100
         df_temp = pd.DataFrame(frequencies, columns=['class', 'exposed'])
+        
         df_temp['geom_id'] = row[Ear_Table_PK]
         df_temp['areaOrLength'] = row['areaOrLength']
         # df_temp['areaOrLen'] = row.geom.length
@@ -174,6 +176,7 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     haz_file = kwargs.get('haz_file', None)
     ear = readear(con, earid)
     haz = readhaz(con, hazid, haz_file)
+    
     if vectorops.cehckprojection(ear, haz):
         warnings.warn("The input co-ordinate system for hazard and EAR were differe, we have updated it for now on the fly but from next time please check your data before computation")
         ear = vectorops.changeprojection(ear, haz)
@@ -322,10 +325,6 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     df = gpd.GeoDataFrame(df)
     # df = gpd.GeoDataFrame(df, geometry='geom')
     
-    
-    # print(len(df),"len ear after merge")
-    # print(df.columns," ear columns after merge")
-    
     # if not onlyaggregated: #due to change of 24 may 2022, it is redundant now because of else statement in coming condition.
     #     df['exposure_id'] = expid
     #     writevector.writeexposure(df, con, schema)
@@ -345,10 +344,6 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
             df['population_exposure'] = np.nan
             df['population_exposure_rel'] = np.nan
 
-    # default columns for standard database table
-    # df = df.rename(columns={value_col: "value_exposure",
-                            # pop_col: "population_exposure",
-                            # })
     df['areaOrLen'] = df['exposed'] * df['areaOrLength']/100  
     if pop_col:
         df['population_exposure'] = df['exposed'] * df[pop_col]/100 
@@ -364,10 +359,21 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
         df=df.drop(value_col,axis=1)
     if pop_col in df.columns:
         df=df.drop(pop_col,axis=1)
-    writevector.writeexposure(df, con, schema)
 
-    # else:
-    #     writevector.writeexposure(df, con, schema)
+    if is_aggregated:
+        writevector.writeexposure(df, con, schema)
+    else:
+        missing_ear = ear[~ear[Ear_Table_PK].isin(df['geom_id'])]
+        missing_ear=missing_ear.rename(columns={Ear_Table_PK: "geom_id"})
+        missing_ear["exposure_id"]=expid
+        for col in missing_ear.columns:
+            if col not in df.columns:
+                missing_ear=missing_ear.drop(col,axis=1)
+        for col in df.columns:
+            if col not in missing_ear.columns:
+                missing_ear[col]=0
+        merged_df = pd.concat([df, missing_ear], ignore_index=True, sort=False)
+        writevector.writeexposure(merged_df, con, schema)
 
     #************Below is the existing aggregation function written till 24 may 2022. Now we changed it to store in single table**************#
     # if is_aggregated:
