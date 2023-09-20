@@ -62,3 +62,8 @@ def readhaz(connstr, hazid, haz_file):
 
     src = rasterio.open(outfile)
     return src
+
+# def read_raster_ear(connstr, ear_id, ear_file):
+#     ear_metadata = readmeta.earmeta(connstr, ear_id)
+#     src = rasterio.open(outfile)
+#     return src

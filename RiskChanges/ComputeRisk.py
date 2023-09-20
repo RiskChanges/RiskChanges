@@ -22,19 +22,17 @@ def find_duplicates(arr):
 
 def dutch_method(xx, yy):
     # compute risk based on dutch method where xx is value axis and yy is probability axis
-    print(xx,"xxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
-    duplicates, indices = find_duplicates(xx)
-    print(duplicates,"duplicates")
-    print(indices,"indices")
-    if len(duplicates)>0:
-        for key in indices.keys():
-            if key!=0 and len(indices[key])>1:
-                increment=0.0001
-                for i in indices[key]:
-                    xx[i]=xx[i]+increment if xx[i]+increment not in xx else xx[i]
-                    increment=increment+0.0001
-                
-    args = np.argsort(np.array(xx,dtype=np.float64))
+    # duplicates, indices = find_duplicates(xx)
+    # if len(duplicates)>0:
+    #     for key in indices.keys():
+    #         if key!=0 and len(indices[key])>1:
+    #             increment=0.0001
+    #             for i in indices[key]:
+    #                 xx[i]=xx[i]+increment if xx[i]+increment not in xx else xx[i]
+    #                 increment=increment+0.0001
+    # args = np.argsort(np.array(xx,dtype=np.float64))
+    
+    args = np.argsort(np.array(yy,dtype=np.float64))[::-1]
     xx = [xx[i] for i in args]
     yy = [yy[i] for i in args]
     AAL = auc(x=xx, y=yy)+(xx[0]*yy[0])
@@ -80,9 +78,13 @@ def calculateRisk(lossdf, columns, probs):
         xx = row[columns].values.tolist()
         yy = probs
         aal = dutch_method(xx, yy)
-        # print('ear',aal)
         ear_id = row['geom_id']
         new_row = {'geom_id': ear_id, 'AAL': aal}
+        print("********************")
+        print(xx,"xx")
+        print(yy,"yy")
+        print(aal,"aal")
+        print(ear_id,"ear_id")
         # append row to the dataframe
         risktable = risktable.append(new_row, ignore_index=True)
     assert not risktable.empty, f"The Risk calculation failed"
@@ -96,6 +98,7 @@ def ComputeRisk(con, lossids, riskid, **kwargs):
 
     checkUniqueHazard(con, lossids)
     lossdf, columns, probs = PrepareLossForRisk(con, lossids)
+
     risk = calculateRisk(lossdf, columns, probs)
     metatable = readmeta.readLossMeta(con, lossids[0])
     schema = metatable.workspace[0]

@@ -8,6 +8,13 @@ from .RiskChangesOps.readraster import readhaz
 from .RiskChangesOps.readvector import readear, readAdmin
 from .RiskChangesOps import readmeta
 from sqlalchemy import create_engine
+from rasterio.io import MemoryFile
+import rasterio
+from rasterio.enums import Resampling
+# from rasterio.coords import disjoint_bounds
+# from rasterio.transform import from_origin
+# from rasterio.windows import Window
+# from collections import Counter
 
 def polygonExposure(ear, haz, expid, Ear_Table_PK):
     df = pd.DataFrame()
@@ -407,3 +414,293 @@ len_ras = zoneraster.count()
 assert vectorops.cehckprojection(
    ear, haz), "The hazard and EAR do not have same projection system please check it first"
 ''' 
+
+def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
+    print("ComputeRasterExposure")
+    try:
+        metatable = readmeta.earmeta(con, earid)
+        print(metatable,"metatable return")
+        schema = metatable.workspace[0]
+        admin_id = kwargs.get('adminunit_id', None)
+        print(admin_id,"adddddd")
+        
+        haz_file = kwargs.get('haz_file', None)
+        ear_file = kwargs.get('ear_file', None)
+
+        hazard_raster = readhaz(con, hazid, haz_file)
+        ear_raster = rasterio.open(ear_file) #handle this
+
+        final_x_res=int(ear_raster.res[0])
+        final_y_res=int(ear_raster.res[1])
+        resampled_haz_width=int((hazard_raster.width * hazard_raster.res[0]) / final_x_res)
+        resampled_haz_height=int((hazard_raster.height * hazard_raster.res[1]) / final_y_res)
+        resampled_ear_width=int((ear_raster.width * ear_raster.res[0]) / final_x_res)
+        resampled_ear_height=int((ear_raster.height * ear_raster.res[1]) / final_y_res)
+        # Resample the source raster to match the target resolution
+        resampled_haz_data = hazard_raster.read(
+            out_shape=(hazard_raster.count, resampled_haz_height, resampled_haz_width),
+            resampling=Resampling.nearest
+        )
+        resampled_ear_data = ear_raster.read(
+            out_shape=(ear_raster.count, resampled_ear_height, resampled_ear_width),
+            resampling=Resampling.nearest
+        )
+        
+        # Get x and y origin based on the original transformation
+        haz_x_origin, haz_y_origin = hazard_raster.transform[2],hazard_raster.transform[5] 
+        ear_x_origin, ear_y_origin = ear_raster.transform[2],ear_raster.transform[5] 
+
+        # Create a new Affine transformation with the updated pixel dimensions
+        new_haz_transform = rasterio.transform.Affine(final_x_res,0.0, haz_x_origin,0.0,-final_y_res, haz_y_origin)
+        new_ear_transform = rasterio.transform.Affine(final_x_res,0.0, ear_x_origin,0.0,-final_y_res, ear_y_origin)
+
+        resampled_haz_meta = {
+            'driver': 'GTiff',
+            'dtype': resampled_haz_data.dtype,
+            'count': 1,  # Number of bands
+            'height': resampled_haz_height,
+            'width': resampled_haz_width,
+            'crs': hazard_raster.crs,  # Replace with your desired CRS
+            'transform': new_haz_transform
+        }
+        resampled_ear_meta = {
+            'driver': 'GTiff',
+            'dtype': resampled_ear_data.dtype,
+            'count': 1,  # Number of bands
+            'height': resampled_ear_height,
+            'width': resampled_ear_width,
+            'crs': ear_raster.crs,  # Replace with your desired CRS
+            'transform': new_ear_transform
+        }
+
+        with MemoryFile() as memfile:
+            with memfile.open(**resampled_haz_meta) as dst:
+                dst.write(resampled_haz_data)
+            resampled_hazard_raster = memfile.open()
+            
+        with MemoryFile() as memfile:
+            with memfile.open(**resampled_ear_meta) as dst:
+                dst.write(resampled_ear_data)
+            resampled_ear_raster = memfile.open()
+            
+        hazard_raster_data = resampled_hazard_raster.read(1)  # Read the first band of raster 1
+        ear_raster_data = resampled_ear_raster.read(1)  # Read the first band of raster 2
+
+        hazard_bounds = resampled_hazard_raster.bounds #Get the extent of hazard dataset
+        ear_bounds = resampled_ear_raster.bounds #Get the extent of hazard dataset
+        
+        # Calculate intersection bounds
+        intersection_bounds = (
+            max(ear_bounds.left, hazard_bounds.left),
+            max(ear_bounds.bottom, hazard_bounds.bottom),
+            min(ear_bounds.right, hazard_bounds.right),
+            min(ear_bounds.top, hazard_bounds.top)
+        )
+        
+        hazard_window = resampled_hazard_raster.window(*intersection_bounds)
+        hazard_row_off,hazard_col_off = int(hazard_window.row_off), int(hazard_window.col_off)
+        hazard_height,hazard_width = int(hazard_window.height), int(hazard_window.width)
+
+        ear_window = resampled_ear_raster.window(*intersection_bounds)
+        ear_row_off, ear_col_off = int(ear_window.row_off), int(ear_window.col_off)
+        ear_height,ear_width  = int(ear_window.height), int(ear_window.width)
+        
+        clipped_hazard_raster_data = hazard_raster_data[hazard_row_off:(hazard_row_off + hazard_height), hazard_col_off:(hazard_col_off + hazard_width)]
+        clipped_ear_raster_data = ear_raster_data[ear_row_off:(ear_row_off + ear_height), ear_col_off:(ear_col_off + ear_width)]
+        
+        # pivot_data = pd.DataFrame(index=unique_ear_pixel_values, columns=unique_hazard_pixel_values, dtype=int)
+        # # print("pivot data")
+        # # # Fill the pivot table with counts
+        # for hazard_value in unique_hazard_pixel_values:
+        #     print(hazard_value,"hazard_value")
+        #     for ear_value in unique_ear_pixel_values:
+        #         count = np.sum((clipped_hazard_raster == hazard_value) & (clipped_ear_raster == ear_value))
+        #         pivot_data.at[ear_value, hazard_value] = count
+        # print(pivot_data)
+        
+        #create empty dataframe
+        total_pixel_count=ear_height*ear_width
+        if admin_id:
+            df = pd.DataFrame(columns=["hazard_name", "ear_name", "total_pixel_exposed","total_area_exposed","relative_exposed","admin_id"])
+            ear_x_origin = resampled_ear_raster.transform[2]+(ear_col_off*final_x_res)
+            ear_y_origin = resampled_ear_raster.transform[5]+(ear_row_off*final_y_res)
+
+            haz_x_origin = resampled_hazard_raster.transform[2]+(hazard_col_off*final_x_res)
+            haz_y_origin = resampled_hazard_raster.transform[5]+(hazard_row_off*final_y_res)
+            
+            # Create a new Affine transformation with the updated pixel dimensions
+            new_haz_transform = rasterio.transform.Affine(final_x_res,0.0, haz_x_origin,0.0,-final_y_res, haz_y_origin)
+            new_ear_transform = rasterio.transform.Affine(final_x_res,0.0, ear_x_origin,0.0,-final_y_res, ear_y_origin)
+            
+            print("ComputeRasterExposure admin_id")
+            clipped_haz_meta = {
+                'driver': 'GTiff',
+                'dtype': clipped_hazard_raster_data.dtype,
+                'count': 1,  # Number of bands
+                'height': hazard_height,
+                'width': hazard_width,
+                'crs': hazard_raster.crs,  # Replace with your desired CRS
+                'transform': new_haz_transform
+            }
+            clipped_ear_meta = {
+                'driver': 'GTiff',
+                'dtype': clipped_ear_raster_data.dtype,
+                'count': 1,  # Number of bands
+                'height': ear_height,
+                'width': ear_width,
+                'crs': ear_raster.crs,  # Replace with your desired CRS
+                'transform': new_ear_transform
+            }
+            
+            print("abc")
+
+            with MemoryFile() as memfile:
+                with memfile.open(**clipped_haz_meta) as dst:
+                    dst.write(clipped_hazard_raster_data,1)
+                clipped_hazard_raster = memfile.open()
+            print("abcdef")
+            with MemoryFile() as memfile:
+                with memfile.open(**clipped_ear_meta) as dst:
+                    dst.write(clipped_ear_raster_data,1)
+                clipped_ear_raster = memfile.open()
+                
+            admin_df = readAdmin(con, admin_id)
+            adminmeta = readmeta.getAdminMeta(con, admin_id)
+            adminpk = adminmeta.col_admin[0] or adminmeta.data_id[0]
+            # print(admin[adminpk])
+            
+            print("before xxxxx")
+            
+            for index, admin in admin_df.iterrows():
+                # Clip the raster data by the administrative unit's geometry
+                print("xxxxx")
+                masked_hazard_raster_data, haz_out_transform = rasterio.mask.mask(clipped_hazard_raster, [admin.geom], crop=True, nodata=0, all_touched=False)
+                masked_ear_raster_data, ear_out_transform = rasterio.mask.mask(clipped_ear_raster, [admin.geom], crop=True, nodata=0, all_touched=False)
+                print(haz_out_transform,"haz_out_transform")
+                print(ear_out_transform,"ear_out_transform")
+                has_nodata = np.isnan(masked_hazard_raster_data).any()  
+                if has_nodata:
+                    masked_hazard_raster_data = np.nan_to_num(masked_hazard_raster_data, nan=0.0)
+                nodata = resampled_hazard_raster.nodata
+                masked_hazard_raster_data[masked_hazard_raster_data == nodata]=0.0
+                # masked_hazard_raster_data = masked_hazard_raster_data[masked_hazard_raster_data != nodata] 
+                
+                #handeling nodata and nan value in ear datasets
+                has_nodata = np.isnan(masked_ear_raster_data).any()  
+                if has_nodata:
+                    masked_ear_raster_data = np.nan_to_num(masked_ear_raster_data, nan=0.0)
+                nodata = resampled_ear_raster.nodata
+                masked_ear_raster_data[masked_ear_raster_data == nodata]=0.0
+                # masked_ear_raster_data = masked_ear_raster_data[masked_ear_raster_data != nodata] 
+                    
+                # print(masked_hazard_raster_data,"masked_hazard_raster_data")
+                # print(masked_ear_raster_data,"masked_ear_raster_data")
+                unique_ear_pixel_values=np.unique(masked_ear_raster_data)
+                unique_hazard_pixel_values=np.unique(masked_hazard_raster_data)
+                
+                # print(unique_ear_pixel_values,"unique_ear_pixel_values")
+                # print(unique_hazard_pixel_values,"unique_hazard_pixel_values")
+                
+                ear_data_shape = masked_ear_raster_data.shape
+                hazard_data_shape = masked_hazard_raster_data.shape
+                # print(ear_data_shape,hazard_data_shape,"shapes")
+                
+                if ear_data_shape != hazard_data_shape:
+                    # Ensure array shapes match along the second dimension
+                    if ear_data_shape[1] < hazard_data_shape[1]:
+                        # Pad masked_ear_raster_data with zeros to match array2's shape
+                        diff = masked_hazard_raster_data.shape[1] - masked_ear_raster_data.shape[1]
+                        padding = [(0, 0), (0, diff), (0, 0)]  # Pad along the second dimension
+                        masked_ear_raster_data = np.pad(masked_ear_raster_data, padding, mode='constant', constant_values=0)
+
+                    else:
+                        # Pad masked_hazard_raster_data with zeros to match masked_ear_raster_data's shape
+                        diff = masked_ear_raster_data.shape[1] - masked_hazard_raster_data.shape[1]
+                        padding = [(0, 0), (0, diff), (0, 0)]  # Pad along the second dimension
+                        masked_hazard_raster_data = np.pad(masked_hazard_raster_data, padding, mode='constant', constant_values=0)
+                        
+                    if ear_data_shape[2] < hazard_data_shape[2]:
+                        # Pad masked_ear_raster_data with zeros to match array2's shape
+                        diff =  hazard_data_shape[2] - ear_data_shape[2]
+                        padding = [(0, 0), (0, 0), (0, diff)]  # Pad along the second dimension
+                        masked_ear_raster_data = np.pad(masked_ear_raster_data, padding, mode='constant', constant_values=0)
+
+                    else:
+                        # Pad masked_hazard_raster_data with zeros to match masked_ear_raster_data's shape
+                        diff = ear_data_shape[2] -  hazard_data_shape[2]
+                        padding = [(0, 0), (0, 0), (0, diff)]  # Pad along the second dimension
+                        masked_hazard_raster_data = np.pad(masked_hazard_raster_data, padding, mode='constant', constant_values=0)
+                # print(masked_hazard_raster_data.shape,masked_ear_raster_data.shape,"shapes")
+                
+                # if ear_data_shape != hazard_data_shape:
+                #     # Assuming the mismatched dimension is the second dimension (847 vs. 848)
+                #     if ear_data_shape[1] < hazard_data_shape[1]:
+                #         # Broadcast masked_ear_raster_data to match hazard_data_shape
+                #         masked_ear_raster_data = np.broadcast_to(masked_ear_raster_data, hazard_data_shape)
+                #     else:
+                #         # Reshape masked_hazard_raster_data to match ear_data_shape
+                #         masked_hazard_raster_data =np.broadcast_to(masked_hazard_raster_data, ear_data_shape)
+                # print(masked_ear_raster_data.shape,masked_hazard_raster_data.shape,"shapes")
+                
+                for hazard_value in unique_hazard_pixel_values:
+                    for ear_value in unique_ear_pixel_values:
+                        
+                        total_pixel_exposed = np.sum((masked_hazard_raster_data == hazard_value) & (masked_ear_raster_data == ear_value))
+                        print(total_pixel_exposed,"total_pixel_exposed")
+                        total_area_exposed=total_pixel_exposed*final_x_res*final_y_res
+                        relative_exposed=total_pixel_exposed*100/total_pixel_count
+                        df = df.append({
+                                "hazard_name": hazard_value,
+                                "ear_name": ear_value, 
+                                "total_pixel_exposed": total_pixel_exposed,
+                                "total_area_exposed":total_area_exposed,
+                                "relative_exposed":round(relative_exposed,3),
+                                "admin_id":admin[adminpk]
+                                }, ignore_index=True)
+        else:
+            df = pd.DataFrame(columns=["hazard_name", "ear_name", "total_pixel_exposed","total_area_exposed","relative_exposed"])
+             
+            # print("1234589")
+            #handeling nodata and nan value in hazard datasets
+            has_nodata = np.isnan(clipped_hazard_raster_data).any()  
+            if has_nodata:
+                clipped_hazard_raster_data = np.nan_to_num(clipped_hazard_raster_data, nan=0.0)
+            nodata = resampled_hazard_raster.nodata
+            clipped_hazard_raster_data[clipped_hazard_raster_data == nodata]=0.0
+            clipped_hazard_raster_data = clipped_hazard_raster_data[clipped_hazard_raster_data != nodata] 
+            
+            #handeling nodata and nan value in ear datasets
+            has_nodata = np.isnan(clipped_ear_raster_data).any()  
+            if has_nodata:
+                clipped_ear_raster_data = np.nan_to_num(clipped_ear_raster_data, nan=0.0)
+            nodata = resampled_ear_raster.nodata
+            clipped_ear_raster_data[clipped_ear_raster_data == nodata]=0.0
+            clipped_ear_raster_data = clipped_ear_raster_data[clipped_ear_raster_data != nodata] 
+            # print("12345101112")
+            
+            #Get unique pixel value in hazard and ear datasets
+            unique_ear_pixel_values=np.unique(clipped_ear_raster_data)
+            unique_hazard_pixel_values=np.unique(clipped_hazard_raster_data)
+            for hazard_value in unique_hazard_pixel_values:
+                for ear_value in unique_ear_pixel_values:
+                    total_pixel_exposed = np.sum((clipped_hazard_raster_data == hazard_value) & (clipped_ear_raster_data == ear_value))
+                    total_area_exposed=total_pixel_exposed*final_x_res*final_y_res
+                    relative_exposed=total_pixel_exposed*100/total_pixel_count
+                    df = df.append({
+                            "hazard_name": hazard_value,
+                            "ear_name": ear_value, 
+                            "total_pixel_exposed": total_pixel_exposed,
+                            "total_area_exposed":total_area_exposed,
+                            "relative_exposed":round(relative_exposed,3),
+                            }, ignore_index=True)
+                    
+            df['admin_id'] = None
+            # print(df)
+        table_name="raster_exposure_result"
+        df['exposure_id'] = expid
+        writevector.writeexposure(df, con, schema,table_name)
+        print("done")
+    except Exception as e:
+        print("error ",str(e))
+        
+    
