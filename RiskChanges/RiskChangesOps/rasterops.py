@@ -10,4 +10,5 @@ def cropraster(raster,geometry):
         return maska,transform,len_ras
     except Exception as e:
         print(f"error from crop raster: {str(e)}")
-        return None
+        return None,None,None
+
