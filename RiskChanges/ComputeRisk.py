@@ -32,7 +32,8 @@ def dutch_method(xx, yy):
     #                 increment=increment+0.0001
     # args = np.argsort(np.array(xx,dtype=np.float64))
     
-    args = np.argsort(np.array(yy,dtype=np.float64))[::-1]
+    args = np.argsort(np.array(xx,dtype=np.float64))[::-1]
+    # args = np.argsort(np.array(yy,dtype=np.float64))[::-1]
     xx = [xx[i] for i in args]
     yy = [yy[i] for i in args]
     AAL = auc(x=xx, y=yy)+(xx[0]*yy[0])
