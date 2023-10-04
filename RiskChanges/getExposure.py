@@ -5,8 +5,8 @@ import numpy as np
 from .RiskChangesOps.readvulnerability import readIntVuln, readSusVuln
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
-import logging
-logger = logging.getLogger(__file__)
+# import logging
+# logger = logging.getLogger(__file__)
 #! create function for similar calculation
 
 def add_hazard_class(exposure,min_thresholds,classificationScheme):
@@ -27,7 +27,7 @@ def add_hazard_class(exposure,min_thresholds,classificationScheme):
             if (val == min_thresholds[-1]):
                 exposure['class'] = np.where(
                     exposure['class'] >= i+1, i+1, exposure['class'])
-        logger.info(f"{convert_dict} convert_dict")
+        # logger.info(f"{convert_dict} convert_dict")
         exposure['class'].replace(convert_dict, inplace=True)
         return True,exposure,convert_dict
     except Exception as e:
@@ -42,7 +42,7 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         exposure = readvector.prepareExposureForLoss(con, exposureid)
         hazid = metadata['hazid']
         classificationScheme = readmeta.classificationscheme(con, hazid)
-        logger.info(f"{classificationScheme} classificationScheme")
+        # logger.info(f"{classificationScheme} classificationScheme")
         thresholds=classificationScheme['val1'].unique()
         thresholds.sort()
         min_thresholds=[float(val) for val in thresholds]
@@ -53,7 +53,7 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         else:
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result}")
             
-        logger.info(f"{exposure.columns} column after add_hazard_class_result")
+        # logger.info(f"{exposure.columns} column after add_hazard_class_result")
         # exposure['class'].replace(convert_dict, inplace=True)
         
         # if column is count just count the number of feature exposed
