@@ -3,7 +3,7 @@ import requests
 from geoalchemy2 import Geometry, WKTElement
 from sqlalchemy import *
 from owslib.wfs import WebFeatureService
-
+from .utils import get_geom_type,is_utm_epsg,utm_finder
 
 def LoadWFS(wfsURL, layer_name, connstr, layer_name_db, index, schema):
     #TODO if gdf is not projected, convert it
@@ -16,18 +16,39 @@ def LoadWFS(wfsURL, layer_name, connstr, layer_name_db, index, schema):
         # Read data from URL
         gdf = gpd.read_file(data_url)
         gdf = gdf[gdf.is_valid]
+        
+        #Get geometry type
+        geometry_types= gdf.geom_type.unique()
+        success,response=get_geom_type(geometry_types)
+        if success:
+            geometry_type=response
+        else:
+            return False, response, None
+        
+        #Handle CRS
+        gdf_crs = gdf.crs.to_epsg()
+        is_UTM_epsg=is_utm_epsg(gdf_crs)
+        if not is_UTM_epsg:
+            gdf_bbox  = gdf.total_bounds
+            min_x, min_y, max_x, max_y = gdf_bbox
+            bbox=[min_x, min_y, max_x, max_y]
+            success,dst_utm_epsg=utm_finder(gdf_crs,bbox)
+            if not success:
+                error=str(dst_utm_epsg)
+                return False,error,None
+            target_crs = CRS.from_epsg(dst_utm_epsg).to_string()
+            gdf = gdf.to_crs(target_crs)
+        
         gdf[index] = gdf.index
-
         # Creating SQLAlchemy's engine to use
         engine = create_engine(connstr)
         gdf.to_postgis(name=layer_name_db, con=engine,
                     schema=schema, if_exists='replace')
-        
         # close engine
         engine.dispose()
-        return True, "successful"
+        return True, "successful",geometry_type
     except Exception as e:
-        return False, str(e)
+        return False, str(e),None
 
 
 # LoadWFS(wfsURL="http://geo.stat.fi/geoserver/vaestoruutu/wfs",layer_name='vaestoruutu:vaki2005_1km_kp',connstr='postgresql://postgres:puntu@localhost:5432/postgres',lyrName='Tekson_WFS',schema='tekson')
