@@ -569,15 +569,19 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
             adminpk = adminmeta.col_admin[0] or adminmeta.data_id[0]
             # print(admin[adminpk])
             
-            print("before xxxxx")
+            # print("before xxxxx")
             
             for index, admin in admin_df.iterrows():
                 # Clip the raster data by the administrative unit's geometry
-                print("xxxxx")
-                masked_hazard_raster_data, haz_out_transform = rasterio.mask.mask(clipped_hazard_raster, [admin.geom], crop=True, nodata=0, all_touched=False)
-                masked_ear_raster_data, ear_out_transform = rasterio.mask.mask(clipped_ear_raster, [admin.geom], crop=True, nodata=0, all_touched=False)
-                print(haz_out_transform,"haz_out_transform")
-                print(ear_out_transform,"ear_out_transform")
+                print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+                try:
+                    masked_hazard_raster_data, haz_out_transform = rasterio.mask.mask(clipped_hazard_raster, [admin.geom], crop=True, nodata=0, all_touched=False)
+                    masked_ear_raster_data, ear_out_transform = rasterio.mask.mask(clipped_ear_raster, [admin.geom], crop=True, nodata=0, all_touched=False)
+                except Exception as e:
+                    print(str(e),"mask error")
+                    continue
+                # print(haz_out_transform,"haz_out_transform")
+                # print(ear_out_transform,"ear_out_transform")
                 has_nodata = np.isnan(masked_hazard_raster_data).any()  
                 if has_nodata:
                     masked_hazard_raster_data = np.nan_to_num(masked_hazard_raster_data, nan=0.0)
@@ -630,23 +634,16 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
                         diff = ear_data_shape[2] -  hazard_data_shape[2]
                         padding = [(0, 0), (0, 0), (0, diff)]  # Pad along the second dimension
                         masked_hazard_raster_data = np.pad(masked_hazard_raster_data, padding, mode='constant', constant_values=0)
-                # print(masked_hazard_raster_data.shape,masked_ear_raster_data.shape,"shapes")
-                
-                # if ear_data_shape != hazard_data_shape:
-                #     # Assuming the mismatched dimension is the second dimension (847 vs. 848)
-                #     if ear_data_shape[1] < hazard_data_shape[1]:
-                #         # Broadcast masked_ear_raster_data to match hazard_data_shape
-                #         masked_ear_raster_data = np.broadcast_to(masked_ear_raster_data, hazard_data_shape)
-                #     else:
-                #         # Reshape masked_hazard_raster_data to match ear_data_shape
-                #         masked_hazard_raster_data =np.broadcast_to(masked_hazard_raster_data, ear_data_shape)
-                # print(masked_ear_raster_data.shape,masked_hazard_raster_data.shape,"shapes")
+               
+                print(unique_hazard_pixel_values,"unique_hazard_pixel_valuesunique_hazard_pixel_valuesunique_hazard_pixel_values")
+                print(unique_ear_pixel_values,"unique_ear_pixel_valuesunique_ear_pixel_valuesunique_ear_pixel_values")
                 
                 for hazard_value in unique_hazard_pixel_values:
+                    print(hazard_value,"hazard_valueeeeeeeeeeeeeeeeee############################")
                     for ear_value in unique_ear_pixel_values:
-                        
+                        print(hazard_value,"ear_valueeeeeeeeeeeeeeeeee")
                         total_pixel_exposed = np.sum((masked_hazard_raster_data == hazard_value) & (masked_ear_raster_data == ear_value))
-                        print(total_pixel_exposed,"total_pixel_exposed")
+                        # print(total_pixel_exposed,"total_pixel_exposed")
                         total_area_exposed=total_pixel_exposed*final_x_res*final_y_res
                         relative_exposed=total_pixel_exposed*100/total_pixel_count
                         df = df.append({

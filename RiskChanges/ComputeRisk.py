@@ -31,11 +31,15 @@ def dutch_method(xx, yy):
     #                 xx[i]=xx[i]+increment if xx[i]+increment not in xx else xx[i]
     #                 increment=increment+0.0001
     # args = np.argsort(np.array(xx,dtype=np.float64))
-    
-    args = np.argsort(np.array(xx,dtype=np.float64))[::-1]
-    # args = np.argsort(np.array(yy,dtype=np.float64))[::-1]
-    xx = [xx[i] for i in args]
-    yy = [yy[i] for i in args]
+    # args = np.argsort(np.array(xx,dtype=np.float64))[::-1]
+    # xx = [xx[i] for i in args]
+    # yy = [yy[i] for i in args]
+    # AAL = auc(x=xx, y=yy)+(xx[0]*yy[0])
+    # return AAL
+    xx = np.sort(np.array(xx,dtype=np.float64))[::-1]
+    yy = np.sort(np.array(yy,dtype=np.float64))
+    xx = [x for x in xx]
+    yy = [y for y in yy]
     AAL = auc(x=xx, y=yy)+(xx[0]*yy[0])
     return AAL
 
@@ -68,7 +72,8 @@ def PrepareLossForRisk(con, lossids):
             prepared_loss = lossdata
             i = False
         else:
-            prepared_loss = prepared_loss.merge(lossdata, on='geom_id',how='outer')
+            prepared_loss = prepared_loss.merge(lossdata, on='geom_id')
+            # prepared_loss = prepared_loss.merge(lossdata, on='geom_id',how='outer')
     prepared_loss[cols]=prepared_loss[cols].fillna(value=0)
     return prepared_loss, cols, probs
 
@@ -81,11 +86,11 @@ def calculateRisk(lossdf, columns, probs):
         aal = dutch_method(xx, yy)
         ear_id = row['geom_id']
         new_row = {'geom_id': ear_id, 'AAL': aal}
-        print("********************")
-        print(xx,"xx")
-        print(yy,"yy")
-        print(aal,"aal")
-        print(ear_id,"ear_id")
+        # print("********************")
+        # print(xx,"xx")
+        # print(yy,"yy")
+        # print(aal,"aal")
+        # print(ear_id,"ear_id")
         # append row to the dataframe
         risktable = risktable.append(new_row, ignore_index=True)
     assert not risktable.empty, f"The Risk calculation failed"
