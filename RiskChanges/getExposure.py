@@ -5,11 +5,11 @@ import numpy as np
 from .RiskChangesOps.readvulnerability import readIntVuln, readSusVuln
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
-# import logging
-# logger = logging.getLogger(__file__)
+import logging
+logger = logging.getLogger(__file__)
 #! create function for similar calculation
 
-def add_hazard_class(exposure,min_thresholds,classificationScheme):
+def add_hazard_class(exposure,min_thresholds,classificationScheme,haz_class_field="class"):
     # Change the classes to the user defined class
     try:
         convert_dict = {}
@@ -22,13 +22,13 @@ def add_hazard_class(exposure,min_thresholds,classificationScheme):
                 name = name['class_name'].to_list()[0]
                 convert_dict[i+1] = name
             except Exception as e:
-                raise Exception(f"Error in getSummary {str(e)}")
-            # if it is last class, then need to assign max class for all result
+                return(False,str(e),None)
+            
             if (val == min_thresholds[-1]):
-                exposure['class'] = np.where(
-                    exposure['class'] >= i+1, i+1, exposure['class'])
-        # logger.info(f"{convert_dict} convert_dict")
-        exposure['class'].replace(convert_dict, inplace=True)
+                exposure[haz_class_field] = np.where(
+                    exposure[haz_class_field] >= i+1, i+1, exposure[haz_class_field])
+                
+        exposure[haz_class_field].replace(convert_dict, inplace=True)
         return True,exposure,convert_dict
     except Exception as e:
         return False,str(e),None    
@@ -42,7 +42,6 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         exposure = readvector.prepareExposureForLoss(con, exposureid)
         hazid = metadata['hazid']
         classificationScheme = readmeta.classificationscheme(con, hazid)
-        # logger.info(f"{classificationScheme} classificationScheme")
         thresholds=classificationScheme['val1'].unique()
         thresholds.sort()
         min_thresholds=[float(val) for val in thresholds]
@@ -53,7 +52,6 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         else:
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result}")
             
-        # logger.info(f"{exposure.columns} column after add_hazard_class_result")
         # exposure['class'].replace(convert_dict, inplace=True)
         
         # if column is count just count the number of feature exposed
@@ -301,3 +299,58 @@ def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
         return summary
     except Exception as e:
         raise Exception(f"Error in getSummary {str(e)}")
+
+def getGriddedExposureSummary(con, exposure_id, column='total_area_exposed', agg=False):
+    try:
+        if column not in ['total_pixel_exposed', 'total_area_exposed', 'relative_exposed']:
+            raise ValueError(
+                "column: status must be one of total_pixel_exposed, total_area_exposed or relative_exposed")
+
+        metadata = readmeta.computeloss_meta(con, exposure_id)
+        schema=metadata['Schema']
+        get_exp_data_success, get_exp_response = readvector.read_raster_exposure(con, exposure_id,schema)
+        if get_exp_data_success:
+            exposure=get_exp_response
+        else:
+             raise Exception(f"Error in get exposure data: {get_exp_response}")
+         
+        hazid = metadata['hazid']
+        classificationScheme = readmeta.classificationscheme(con, hazid)
+        thresholds=classificationScheme['val1'].unique()
+        thresholds.sort()
+        min_thresholds=[float(val) for val in thresholds]
+        type_col = "ear_name" #metadata["TypeColumn"]
+        response,add_hazard_class_result,hazard_class_dict=add_hazard_class(exposure,min_thresholds,classificationScheme,"hazard_name")
+        if response:
+            exposure=add_hazard_class_result
+        else:
+            raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result}")
+            
+        if not agg:
+            summary = pd.pivot_table(exposure, values=column, index=[type_col],
+                                    columns=["hazard_name"], fill_value=0) #aggfunc=np.sum, 
+            summary = summary.reset_index()
+            summary = summary.rename(columns={type_col: "Ear Class"})
+            
+        else:
+            summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
+                                    columns=["class"], aggfunc=np.sum, fill_value=0)
+            summary = summary.reset_index()
+            summary = summary.rename(
+                columns={type_col: "Ear Class", "admin_id": "Admin Name"})
+        summary = summary.fillna(0)
+        #to drop column 0.0 if exists
+        if 0.0 in summary.columns:
+            summary = summary.drop(0.0, axis=1)
+        #Add missing hazard class in table
+        for values in hazard_class_dict.values():
+            if values not in summary.columns:
+                summary[values]=0
+        other_columns = [col for col in summary.columns if col not in hazard_class_dict.values()]
+        desired_columns_order=other_columns+list(hazard_class_dict.values())
+        # Step 5: Reorder the columns using reindex with the desired_order followed by the remaining columns
+        summary = summary.reindex(columns=desired_columns_order)
+        return True, summary
+    except Exception as e:
+        return False, str(e)
+        # raise Exception(f"Error in getSummary {str(e)}")
