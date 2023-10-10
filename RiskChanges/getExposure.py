@@ -300,7 +300,7 @@ def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
     except Exception as e:
         raise Exception(f"Error in getSummary {str(e)}")
 
-def getGriddedExposureSummary(con, exposure_id, column='total_area_exposed', agg=False):
+def getGriddedExposureSummary(con, exposure_id, column='total_area_exposed', agg=False,agg_func=False):
     try:
         if column not in ['total_pixel_exposed', 'total_area_exposed', 'relative_exposed']:
             raise ValueError(
@@ -326,18 +326,24 @@ def getGriddedExposureSummary(con, exposure_id, column='total_area_exposed', agg
         else:
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result}")
             
-        if not agg:
+        if agg:
+            summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
+                                    columns=["hazard_name"],  fill_value=0) #aggfunc=np.sum,
+            summary = summary.reset_index()
+            summary = summary.rename(
+                columns={type_col: "Ear Class", "admin_id": "Admin Name"})
+        elif agg_func:
+            summary = pd.pivot_table(exposure, values=column, index=[type_col],
+                                    columns=["hazard_name"], aggfunc=np.sum, fill_value=0) #aggfunc=np.sum,
+            summary = summary.reset_index()
+            summary = summary.rename(
+                columns={type_col: "Ear Class"})
+        else:
             summary = pd.pivot_table(exposure, values=column, index=[type_col],
                                     columns=["hazard_name"], fill_value=0) #aggfunc=np.sum, 
             summary = summary.reset_index()
             summary = summary.rename(columns={type_col: "Ear Class"})
             
-        else:
-            summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
-                                    columns=["class"], aggfunc=np.sum, fill_value=0)
-            summary = summary.reset_index()
-            summary = summary.rename(
-                columns={type_col: "Ear Class", "admin_id": "Admin Name"})
         summary = summary.fillna(0)
         #to drop column 0.0 if exists
         if 0.0 in summary.columns:
