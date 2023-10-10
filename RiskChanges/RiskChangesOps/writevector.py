@@ -41,7 +41,6 @@ def writeexposure(df, connstr, schema,table_name="exposure_result"):
             # CREATE INDEX "idx_ras_exp_id" ON "test_rabina_organization"."raster_exposure_result" ("exposure_id")
             # CREATE INDEX "idx_ras_exp_admin_id" ON "test_rabina_organization"."raster_exposure_result" ("admin_id")
         except Exception as e:
-            print(str(e),"create index exceptoionnnnnnnnnnnnnnnn")
             df.to_sql(table_name, engine, schema,
                     if_exists='append', index=False)
     print('data written')
