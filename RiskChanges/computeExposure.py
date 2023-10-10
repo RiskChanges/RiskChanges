@@ -530,31 +530,31 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
         # Create a new Affine transformation with the updated pixel dimensions
         new_haz_transform = rasterio.transform.Affine(final_x_res,0.0, haz_x_origin,0.0,-final_y_res, haz_y_origin)
         new_ear_transform = rasterio.transform.Affine(final_x_res,0.0, ear_x_origin,0.0,-final_y_res, ear_y_origin)
-        clipped_haz_meta = {
-            'driver': 'GTiff',
-            # 'dtype': clipped_hazard_raster_data.dtype,
-            'count': 1,  # Number of bands
-            'height': hazard_height,
-            'width': hazard_width,
-            'crs': hazard_raster.crs,  # Replace with your desired CRS
-            'transform': new_haz_transform,
-            'dtype': 'int16'
-        }
-        clipped_ear_meta = {
-            'driver': 'GTiff',
-            # 'dtype': clipped_ear_raster_data.dtype,
-            'count': 1,  # Number of bands
-            'height': ear_height,
-            'width': ear_width,
-            'crs': ear_raster.crs,  # Replace with your desired CRS
-            'transform': new_ear_transform,
-            'dtype': 'int16'
-            
-        }
         
         #create empty dataframe
         total_pixel_count=ear_height*ear_width
         if admin_id:
+            clipped_haz_meta = {
+                'driver': 'GTiff',
+                'dtype': clipped_hazard_raster_data.dtype,
+                'count': 1,  # Number of bands
+                'height': hazard_height,
+                'width': hazard_width,
+                'crs': hazard_raster.crs,  # Replace with your desired CRS
+                'transform': new_haz_transform,
+                # 'dtype': 'int16'
+            }
+            clipped_ear_meta = {
+                'driver': 'GTiff',
+                'dtype': clipped_ear_raster_data.dtype,
+                'count': 1,  # Number of bands
+                'height': ear_height,
+                'width': ear_width,
+                'crs': ear_raster.crs,  # Replace with your desired CRS
+                'transform': new_ear_transform,
+                # 'dtype': 'int16'
+                
+            }
             df = pd.DataFrame(columns=["hazard_name", "ear_name", "total_pixel_exposed","total_area_exposed","relative_exposed","admin_id"])
 
             with MemoryFile() as memfile:
@@ -649,6 +649,17 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
                                 "admin_id":admin[adminpk]
                                 }, ignore_index=True)
         else:
+            clipped_haz_meta = {
+                'driver': 'GTiff',
+                # 'dtype': clipped_hazard_raster_data.dtype,
+                'count': 1,  # Number of bands
+                'height': hazard_height,
+                'width': hazard_width,
+                'crs': hazard_raster.crs,  # Replace with your desired CRS
+                'transform': new_haz_transform,
+                'dtype': 'int16'
+            }
+            
             exp_output_file_path = kwargs.get('exp_output_file_path', None)
             with rasterio.open(exp_output_file_path, 'w', **clipped_haz_meta) as dst1:
                 dst1.write(clipped_ear_raster_data, 1)
@@ -696,6 +707,8 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
             df['admin_id'] = None 
         table_name="raster_exposure_result"
         df['exposure_id'] = expid
+        if df.empty:
+            return False, "Empty datasets"
         writevector.writeexposure(df, con, schema,table_name)
         return True,"success"
     except Exception as e:
