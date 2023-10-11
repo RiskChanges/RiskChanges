@@ -22,11 +22,15 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
     df = pd.DataFrame()
     
     for ind, row in ear.iterrows():
-        try:
-            maska, transform,len_ras = rasterops.cropraster(haz, [row.geom])
-        except:
-            print("could not cropraster")
+        crop_raster_success, crop_raster_response,maska, transform,len_ras = rasterops.cropraster(haz, [row.geom])
+        if not crop_raster_success:
+            print(crop_raster_response)
             continue
+            
+        # try:
+        # except:
+            # print("could not cropraster")
+            # continue
         '''
         This code line creates a masked array using the masked_array() function from the numpy.ma module. 
         The masked_array() function takes two arguments: 
@@ -45,13 +49,17 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
         The index of the zero value is identified using the where() function from the numpy module, and that index is used to delete the corresponding elements in both the ids and cus arrays using the delete()
         '''
         if ma.is_masked(unique):
+            print("if")
             unique = unique.filled(0)
             idx = np.where(unique == 0)[0][0]
             ids = np.delete(unique, idx)
             cus = np.delete(counts, idx)
         else:
+            print("else")
             ids = unique
             cus = counts
+        print(ids)
+        print(type(ids),"tyeeeeeeeeeeee")
         if np.isnan(ids).any():
             idx = np.isnan(ids)
             ids = np.delete(ids, idx)
@@ -99,10 +107,15 @@ def lineExposure(ear, haz, expid, Ear_Table_PK):
         except:
             polygon = row.geometry.buffer(buffersize)
             
-        try:
-            maska, transform,len_ras = rasterops.cropraster(haz, [polygon])
-        except:
+        # try:
+        #     maska, transform,len_ras = rasterops.cropraster(haz, [polygon])
+        # except:
+        #     continue
+        crop_raster_success, crop_raster_response,maska, transform,len_ras = rasterops.cropraster(haz, [polygon])
+        if not crop_raster_success:
+            print(crop_raster_response)
             continue
+        
         zoneraster = ma.masked_array(maska, mask=maska == 0)
         if len_ras == 0:
             continue
