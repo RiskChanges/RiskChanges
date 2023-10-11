@@ -26,10 +26,22 @@ def readexposure(connstr, exposureid, schema):
     metatable = readmeta.exposuremeta(connstr, exposureid)
     exposuretable = metatable.exposure_table[0]
     sql = f'SELECT * FROM {schema}."{exposuretable}" as exposuretable WHERE exposuretable.exposure_id={exposureid};'
-    # print(sql)
     exposure_table = pd.read_sql(sql, con=engine)
     engine.close()
     return exposure_table
+
+
+def read_raster_exposure(connstr, exposure_id, schema):
+    try:
+        engine = psycopg2.connect(connstr)
+        metatable = readmeta.exposuremeta(connstr, exposure_id)
+        exposuretable = metatable.exposure_table[0]
+        sql = f'SELECT * FROM {schema}."{exposuretable}" as exposuretable WHERE exposuretable.exposure_id={exposure_id};'
+        exposure_df = pd.read_sql(sql, con=engine)
+        engine.close()
+        return True, exposure_df
+    except Exception as e:
+        return False, str(e)
 
 
 def readexposureGeom(connstr, exposureid):
