@@ -11,12 +11,8 @@ from sqlalchemy import create_engine
 from rasterio.io import MemoryFile
 import rasterio
 from rasterio.enums import Resampling
-# from rasterio.coords import disjoint_bounds
-# from rasterio.transform import from_origin
-# from rasterio.windows import Window
-# from collections import Counter
-import logging
-logger = logging.getLogger(__file__)
+# import logging
+# logger = logging.getLogger(__file__)
 
 def polygonExposure(ear, haz, expid, Ear_Table_PK):
     df = pd.DataFrame()
