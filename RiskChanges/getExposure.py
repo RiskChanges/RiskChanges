@@ -1,12 +1,11 @@
 import geopandas as gpd
 import pandas as pd
 import numpy as np
-
 from .RiskChangesOps.readvulnerability import readIntVuln, readSusVuln
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
-import logging
-logger = logging.getLogger(__file__)
+# import logging
+# logger = logging.getLogger(__file__)
 #! create function for similar calculation
 
 def add_hazard_class(exposure,min_thresholds,classificationScheme,haz_class_field="class"):

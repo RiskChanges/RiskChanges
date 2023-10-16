@@ -5,7 +5,6 @@ from sqlalchemy import create_engine
 
 
 def writeexposure(df, connstr, schema,table_name="exposure_result"):
-    print("write_vector called")
     engine = create_engine(connstr)
     # Execute the raw SQL statement to rename the column and add column value_exposure_rel, population_exposure_rel if not exists
     #! this is not required if updated existing table once
@@ -57,7 +56,6 @@ def writeexposureAgg(df, connstr, schema):
 
 def writeLossAgg(df, connstr, schema):
     engine = create_engine(connstr)
-    # print(engine)
     df.to_sql('loss_result_agg', engine, schema,
               if_exists='append', index=False)
     print('data written')
