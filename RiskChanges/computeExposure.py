@@ -45,17 +45,13 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
         The index of the zero value is identified using the where() function from the numpy module, and that index is used to delete the corresponding elements in both the ids and cus arrays using the delete()
         '''
         if ma.is_masked(unique):
-            print("if")
             unique = unique.filled(0)
             idx = np.where(unique == 0)[0][0]
             ids = np.delete(unique, idx)
             cus = np.delete(counts, idx)
         else:
-            print("else")
             ids = unique
             cus = counts
-        print(ids)
-        print(type(ids),"tyeeeeeeeeeeee")
         if np.isnan(ids).any():
             idx = np.isnan(ids)
             ids = np.delete(ids, idx)
