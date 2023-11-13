@@ -20,20 +20,35 @@ def getHazardMeanIntensity(exposuretable, stepsize, base, threshold):
     return exposuretable
 
 
-def estimatevulnerability(exposuretable, haztype, vulnColumn, con):
+def estimatevulnerability(exposuretable, haztype, hazunit, vulnColumn, con):
     #!not required I guess
-    if haztype == "Susceptibility not relevant":
-        for i in exposuretable[vulnColumn].unique():
+    # if haztype == "Susceptibility not relevant":
+    #     for i in exposuretable[vulnColumn].unique():
 
-            vulnerbaility = readSusVuln(con, i)
+    #         vulnerbaility = readSusVuln(con, i)
+    #         subset_exp = exposuretable[exposuretable[vulnColumn] == i]
+    #         # subset_exp["vuln"]
+    #         subset_exp = pd.merge(left=subset_exp, right=vulnerbaility[[
+    #                               'vulnAVG', 'mean_x']], how='left', left_on=['class'], right_on=['mean_x'], right_index=False)
+    #         #subset_exp.drop(columns= ['hazIntensity_to'])
+    #         subset_exp = subset_exp.rename(columns={"vulnAVG": "vuln"})
+    #         final_df = pd.DataFrame()
+    #         final_df = final_df.append(subset_exp, ignore_index=True)
+    #     exposuretable = None
+    #     exposuretable = final_df
+    
+    if haztype == "Susceptibility" and hazunit=="classes":
+        final_df = pd.DataFrame()
+        for i in exposuretable[vulnColumn].unique():
+            vulnerbaility = readIntVuln(con, i)
+            y = vulnerbaility.vulnAVG.values
+            x = vulnerbaility.mean_x.values
+            exposuretable=exposuretable.rename(columns={'class':'haz_class'})
             subset_exp = exposuretable[exposuretable[vulnColumn] == i]
-            # subset_exp["vuln"]
-            subset_exp = pd.merge(left=subset_exp, right=vulnerbaility[[
-                                  'vulnAVG', 'mean_x']], how='left', left_on=['class'], right_on=['mean_x'], right_index=False)
-            #subset_exp.drop(columns= ['hazIntensity_to'])
-            subset_exp = subset_exp.rename(columns={"vulnAVG": "vuln"})
-            final_df = pd.DataFrame()
+            subset_exp["vuln"] = np.interp(
+                subset_exp.haz_class, x, y, left=0, right=1)
             final_df = final_df.append(subset_exp, ignore_index=True)
+        final_df=final_df.rename(columns={'haz_class':'class'})
         exposuretable = None
         exposuretable = final_df
     else:
@@ -48,7 +63,6 @@ def estimatevulnerability(exposuretable, haztype, vulnColumn, con):
             final_df = final_df.append(subset_exp, ignore_index=True)
         final_df.loc[final_df.vuln < 0, 'vuln':] = 0
         final_df.loc[final_df.vuln > 1, 'vuln':] = 1
-
         exposuretable = None
         exposuretable = final_df
     return exposuretable
@@ -69,7 +83,7 @@ def calculateLoss_spprob(exposuretable, costColumn, spprob,hazunit):
     
     if hazunit=="classes":  #for classified and binary hazards 
         exposuretable = exposuretable.merge(
-            spprob[['sp', 'sp_map_value']], left_on='meanHazard', right_on='sp_map_value', suffixes=('_left', '_right'))
+            spprob[['sp', 'sp_map_value']], left_on='class', right_on='sp_map_value', suffixes=('_left', '_right'))
         exposuretable['loss'] = exposuretable.apply(
             lambda row: row[costColumn]*row.exposed*row.vuln*row.sp/100, axis=1)
     else: #for non-classified hazard
@@ -112,8 +126,9 @@ def ComputeLoss(con, exposureid, lossid, computecol='counts', **kwargs):
     spprob = metadata["spprob"]
     spprob_single = metadata["spprob_single"]
     
-    exposure = getHazardMeanIntensity(exposure, stepsize, base, threshold)
-    exposure = estimatevulnerability(exposure, haztype, vulnColumn, con)
+    if spprob_single:
+        exposure = getHazardMeanIntensity(exposure, stepsize, base, threshold)
+    exposure = estimatevulnerability(exposure, haztype,hazunit, vulnColumn, con)
     
     if computecol == 'Cost':
         costColumn = metadata["costColumn"]

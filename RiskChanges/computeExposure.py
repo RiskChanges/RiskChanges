@@ -186,6 +186,7 @@ def pointExposure(ear, haz, expid, Ear_Table_PK):
 def ComputeExposure(con, earid, hazid, expid, **kwargs):
     is_aggregated = kwargs.get('is_aggregated', False)
     onlyaggregated = kwargs.get('only_aggregated', True)
+    # susceptibility_classes=False
     adminid = kwargs.get('adminunit_id', None)
     haz_file = kwargs.get('haz_file', None)
     ear = readear(con, earid)
@@ -203,6 +204,14 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     geometrytype = ear.geom_type.unique()[0]
     default_cols = ['exposed', "admin_id", 'class',
                     'exposure_id', 'geom_id','areaOrLength']
+    
+    haz_meta=readmeta.hazmeta(con, hazid)
+    haz_intensity=haz_meta.intensity[0]
+    haz_unit=haz_meta.unit[0]
+    
+    # if haz_intensity=="Susceptibility" and haz_unit=="classes":
+    #     susceptibility_classes=True
+        
 
     # if value and population column is available, add these to default cols
     # else just add the additional column, we will add null values for these additional cols
