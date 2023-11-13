@@ -126,8 +126,9 @@ def ComputeLoss(con, exposureid, lossid, computecol='counts', **kwargs):
     spprob = metadata["spprob"]
     spprob_single = metadata["spprob_single"]
     
-    if spprob_single:
+    if hazunit !="classes":
         exposure = getHazardMeanIntensity(exposure, stepsize, base, threshold)
+        
     exposure = estimatevulnerability(exposure, haztype,hazunit, vulnColumn, con)
     
     if computecol == 'Cost':
