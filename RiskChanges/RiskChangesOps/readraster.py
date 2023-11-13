@@ -52,23 +52,27 @@ def refactor(in_image, out_image, base, threshold):
     src.close()
 
 
-def ClassifyHazard(hazard_file, base, stepsize, threshold):
+def ClassifyHazard(hazard_file, base, stepsize, threshold,is_reclassification_required=False):
     infile = hazard_file
     file_name, file_extension = os.path.splitext(infile)
     outfile = hazard_file.replace(file_extension, f"_reclassified{file_extension}")
-    if os.path.isfile(outfile):
-        pass
-    else:
+    if is_reclassification_required or not os.path.isfile(outfile):
         reclassify(infile, outfile, base, stepsize, threshold)
-    return outfile
-
-def RefactorClassifiedHazard(hazard_file, base, threshold):
-    file_name, file_extension = os.path.splitext(hazard_file)
-    outfile = hazard_file.replace(file_extension, f"_reclassified{file_extension}")
     # if os.path.isfile(outfile):
     #     pass
     # else:
-    refactor(hazard_file, outfile, base, threshold)
+    return outfile
+
+def RefactorClassifiedHazard(hazard_file, base, threshold,is_reclassification_required=False):
+    file_name, file_extension = os.path.splitext(hazard_file)
+    outfile = hazard_file.replace(file_extension, f"_reclassified{file_extension}")
+    if is_reclassification_required or not os.path.isfile(outfile):
+        refactor(hazard_file, outfile, base, threshold)
+    # elif not os.path.isfile(outfile):
+    #     refactor(hazard_file, outfile, base, threshold)
+    # if os.path.isfile(outfile):
+    #     pass
+    # else:
     return outfile
 
 
@@ -81,15 +85,16 @@ def readhaz(connstr, hazid, haz_file):
     threshold = hazard_metadata.threshold_val[0] or hazard_metadata.raster_max_value[0]
     intensity_type = hazard_metadata.intensity[0]
     unit=hazard_metadata.unit[0]
+    is_reclassification_required=hazard_metadata.is_reclassification_required[0]
     
     if haz_file:
         hazfile = haz_file
 
     if intensity_type == 'Susceptibility' and unit== "classes":
         # outfile = hazfile
-        outfile = RefactorClassifiedHazard(hazfile, base, threshold)
+        outfile = RefactorClassifiedHazard(hazfile, base, threshold,is_reclassification_required)
     else:
-        outfile = ClassifyHazard(hazfile, base, step_size, threshold)
+        outfile = ClassifyHazard(hazfile, base, step_size, threshold,is_reclassification_required)
         
     src = rasterio.open(outfile)
     return src
