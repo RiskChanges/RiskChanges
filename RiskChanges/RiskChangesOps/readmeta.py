@@ -95,6 +95,7 @@ def computeloss_meta(connstr,exposureid):
     # lossmeta={'spprob':spprob,'spprob_single':spprob_single,'exposureTable':exposureTable,'earID':earID,'hazid':hazid,'earPK':earPK,'Schema':Schema,'costColumn':costColumn,'populColumn':populColumn,'TypeColumn':TypeColumn,'hazunit':hazunit,'hazintensity':hazintensity,'base':base,'stepsize':stepsize,'vulnColumn':vulnColumn,'threshold':threshold,'adminid':adminid}
     
     spprob_single=True
+    spprob=None
     if hazintensity=="Susceptibility":
         spprob=loadspprob(connstr,hazid,hazunit)
         spprob_single=False
