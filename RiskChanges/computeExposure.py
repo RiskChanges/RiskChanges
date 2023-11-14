@@ -45,17 +45,13 @@ def polygonExposure(ear, haz, expid, Ear_Table_PK):
         The index of the zero value is identified using the where() function from the numpy module, and that index is used to delete the corresponding elements in both the ids and cus arrays using the delete()
         '''
         if ma.is_masked(unique):
-            print("if")
             unique = unique.filled(0)
             idx = np.where(unique == 0)[0][0]
             ids = np.delete(unique, idx)
             cus = np.delete(counts, idx)
         else:
-            print("else")
             ids = unique
             cus = counts
-        print(ids)
-        print(type(ids),"tyeeeeeeeeeeee")
         if np.isnan(ids).any():
             idx = np.isnan(ids)
             ids = np.delete(ids, idx)
@@ -190,6 +186,7 @@ def pointExposure(ear, haz, expid, Ear_Table_PK):
 def ComputeExposure(con, earid, hazid, expid, **kwargs):
     is_aggregated = kwargs.get('is_aggregated', False)
     onlyaggregated = kwargs.get('only_aggregated', True)
+    # susceptibility_classes=False
     adminid = kwargs.get('adminunit_id', None)
     haz_file = kwargs.get('haz_file', None)
     ear = readear(con, earid)
@@ -207,6 +204,14 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     geometrytype = ear.geom_type.unique()[0]
     default_cols = ['exposed', "admin_id", 'class',
                     'exposure_id', 'geom_id','areaOrLength']
+    
+    haz_meta=readmeta.hazmeta(con, hazid)
+    haz_intensity=haz_meta.intensity[0]
+    haz_unit=haz_meta.unit[0]
+    
+    # if haz_intensity=="Susceptibility" and haz_unit=="classes":
+    #     susceptibility_classes=True
+        
 
     # if value and population column is available, add these to default cols
     # else just add the additional column, we will add null values for these additional cols
