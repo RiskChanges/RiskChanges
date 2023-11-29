@@ -19,14 +19,19 @@ def reclassify(in_image, out_image, base, stepsize, maxval):
     intensity_data_classified = np.copy(intensity_data)
     for i, threshold in enumerate(thresholds):
         #mean=intensity_data[((intensity_data<threshold) & (intensity_data>=prev))].mean()
-        intensity_data_classified[(
-            (intensity_data < threshold) & (intensity_data >= prev))] = i
-        prev = threshold
         
+        #if it is the first value
+        if i==0:
+            continue
         # if it is the last value, need to assign the max class for all result
-        if threshold == thresholds[-1]:
+        elif threshold == thresholds[-1]:
             intensity_data_classified[(
                 intensity_data >= thresholds[-1])] = i
+        else:
+            intensity_data_classified[(
+                (intensity_data < threshold) & (intensity_data >= prev))] = i
+        prev = threshold
+        
     with rasterio.Env():
         profile = input_image.profile
         with rasterio.open(out_image, 'w', **profile) as dst:
