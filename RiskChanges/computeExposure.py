@@ -163,6 +163,10 @@ def pointExposure(ear, haz, expid, Ear_Table_PK):
         if int(x[0]) == -999:
             classes.append(0)
             exposed_values.append(0)
+        elif int(x[0]) == 0:
+            print(x[0],"xooooooo")
+            classes.append(0)
+            exposed_values.append(0)
         else:
             classes.append(x[0])
             exposed_values.append(100)
