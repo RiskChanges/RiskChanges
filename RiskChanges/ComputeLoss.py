@@ -20,19 +20,35 @@ def getHazardMeanIntensity(exposuretable, stepsize, base, threshold):
     return exposuretable
 
 
-def estimatevulnerability(exposuretable, haztype, vulnColumn, con):
-    if haztype == "Susceptibility":
-        for i in exposuretable[vulnColumn].unique():
+def estimatevulnerability(exposuretable, haztype, hazunit, vulnColumn, con):
+    #!not required I guess
+    # if haztype == "Susceptibility not relevant":
+    #     for i in exposuretable[vulnColumn].unique():
 
-            vulnerbaility = readSusVuln(con, i)
+    #         vulnerbaility = readSusVuln(con, i)
+    #         subset_exp = exposuretable[exposuretable[vulnColumn] == i]
+    #         # subset_exp["vuln"]
+    #         subset_exp = pd.merge(left=subset_exp, right=vulnerbaility[[
+    #                               'vulnAVG', 'mean_x']], how='left', left_on=['class'], right_on=['mean_x'], right_index=False)
+    #         #subset_exp.drop(columns= ['hazIntensity_to'])
+    #         subset_exp = subset_exp.rename(columns={"vulnAVG": "vuln"})
+    #         final_df = pd.DataFrame()
+    #         final_df = final_df.append(subset_exp, ignore_index=True)
+    #     exposuretable = None
+    #     exposuretable = final_df
+    
+    if haztype == "Susceptibility" and hazunit=="classes":
+        final_df = pd.DataFrame()
+        for i in exposuretable[vulnColumn].unique():
+            vulnerbaility = readIntVuln(con, i)
+            y = vulnerbaility.vulnAVG.values
+            x = vulnerbaility.mean_x.values
+            exposuretable=exposuretable.rename(columns={'class':'haz_class'})
             subset_exp = exposuretable[exposuretable[vulnColumn] == i]
-            # subset_exp["vuln"]
-            subset_exp = pd.merge(left=subset_exp, right=vulnerbaility[[
-                                  'vulnAVG', 'mean_x']], how='left', left_on=['class'], right_on=['mean_x'], right_index=False)
-            #subset_exp.drop(columns= ['hazIntensity_to'])
-            subset_exp = subset_exp.rename(columns={"vulnAVG": "vuln"})
-            final_df = pd.DataFrame()
+            subset_exp["vuln"] = np.interp(
+                subset_exp.haz_class, x, y, left=0, right=1)
             final_df = final_df.append(subset_exp, ignore_index=True)
+        final_df=final_df.rename(columns={'haz_class':'class'})
         exposuretable = None
         exposuretable = final_df
     else:
@@ -47,7 +63,6 @@ def estimatevulnerability(exposuretable, haztype, vulnColumn, con):
             final_df = final_df.append(subset_exp, ignore_index=True)
         final_df.loc[final_df.vuln < 0, 'vuln':] = 0
         final_df.loc[final_df.vuln > 1, 'vuln':] = 1
-
         exposuretable = None
         exposuretable = final_df
     return exposuretable
@@ -64,11 +79,29 @@ def calculateLoss(exposuretable, costColumn, spprob=1):
     except Exception as e:
         raise ValueError(f"Caution: Make sure column: '{costColumn}' is valid for loss calculation; Error Detail: {str(e)}")
 
-def calculateLoss_spprob(exposuretable, costColumn, spprob):
-    exposuretable = exposuretable.merge(
-        spprob[['sp', 'sp_map_value']], left_on='meanHazard', right_on='sp_map_value', suffixes=('_left', '_right'))
-    exposuretable['loss'] = exposuretable.apply(
-        lambda row: row[costColumn]*row.exposed*row.vuln*row.sp/100, axis=1)
+def calculateLoss_spprob(exposuretable, costColumn, spprob,hazunit):
+    
+    if hazunit=="classes":  #for classified and binary hazards 
+        exposuretable = exposuretable.merge(
+            spprob[['sp', 'sp_map_value']], left_on='class', right_on='sp_map_value', suffixes=('_left', '_right'))
+        exposuretable['loss'] = exposuretable.apply(
+            lambda row: row[costColumn]*row.exposed*row.vuln*row.sp/100, axis=1)
+    else: #for non-classified hazard
+        # exposuretable = exposuretable.merge(
+        #     spprob[['sp', 'sp_map_value']], left_on='meanHazard', right_on='sp_map_value', suffixes=('_left', '_right'))
+        
+        for index, row in spprob.iterrows():
+            if isinstance(row.val1, str) and row.val1.lower()=="min":
+                exposuretable.loc[exposuretable.meanHazard < float(row.val2), 'sp'] = row.sp_val
+            elif isinstance(row.val2, str) and row.val2.lower()=="max":
+                exposuretable.loc[exposuretable.meanHazard > float(row.val1), 'sp'] = row.sp_val
+            else: 
+                condition = (exposuretable['meanHazard'] > float(row.val1)) & (exposuretable['meanHazard'] < float(row.val2))
+                exposuretable.loc[condition, 'sp'] = row.sp_val
+        
+        exposuretable['loss'] = exposuretable.apply(
+            lambda row: row[costColumn]*row.exposed*row.vuln*row.sp/100, axis=1)
+        
     losstable = exposuretable.groupby(
         ["geom_id"], as_index=False).agg({'loss': 'sum'})
     losstable_lossonly = losstable[["loss", "geom_id"]]
@@ -87,12 +120,17 @@ def ComputeLoss(con, exposureid, lossid, computecol='counts', **kwargs):
     threshold = float(metadata["threshold"])
     stepsize = float(metadata["stepsize"])
     haztype = metadata["hazintensity"]
+    hazunit = metadata["hazunit"]
     vulnColumn = metadata["vulnColumn"]
     schema = metadata["Schema"]
     spprob = metadata["spprob"]
     spprob_single = metadata["spprob_single"]
-    exposure = getHazardMeanIntensity(exposure, stepsize, base, threshold)
-    exposure = estimatevulnerability(exposure, haztype, vulnColumn, con)
+    
+    if hazunit !="classes":
+        exposure = getHazardMeanIntensity(exposure, stepsize, base, threshold)
+        
+    exposure = estimatevulnerability(exposure, haztype,hazunit, vulnColumn, con)
+    
     if computecol == 'Cost':
         costColumn = metadata["costColumn"]
     elif computecol == 'Population':
@@ -102,12 +140,12 @@ def ComputeLoss(con, exposureid, lossid, computecol='counts', **kwargs):
     else:
         exposure['counts'] = 1
         costColumn = 'counts'
-    if spprob == None:
+    # if spprob == None:
+    #     loss = calculateLoss(exposure, costColumn)
+    if spprob_single:
         loss = calculateLoss(exposure, costColumn)
-    elif spprob_single:
-        loss = calculateLoss(exposure, costColumn, spprob)
     else:
-        loss = calculateLoss(exposure, costColumn, spprob)
+        loss = calculateLoss_spprob(exposure, costColumn, spprob,hazunit)
 
     if is_aggregated:
         admin_unit = readvector.readAdmin(con, adminid)

@@ -1,15 +1,14 @@
 import geopandas as gpd
 import pandas as pd
 import numpy as np
-
 from .RiskChangesOps.readvulnerability import readIntVuln, readSusVuln
 from .RiskChangesOps import readmeta, readvector, writevector, AggregateData as aggregator
 
-import logging
-logger = logging.getLogger(__file__)
+# import logging
+# logger = logging.getLogger(__file__)
 #! create function for similar calculation
 
-def add_hazard_class(exposure,min_thresholds,classificationScheme):
+def add_hazard_class(exposure,min_thresholds,classificationScheme,haz_class_field="class"):
     # Change the classes to the user defined class
     try:
         convert_dict = {}
@@ -22,18 +21,18 @@ def add_hazard_class(exposure,min_thresholds,classificationScheme):
                 name = name['class_name'].to_list()[0]
                 convert_dict[i+1] = name
             except Exception as e:
-                raise Exception(f"Error in getSummary {str(e)}")
-            # if it is last class, then need to assign max class for all result
+                return(False,str(e),None)
+            
             if (val == min_thresholds[-1]):
-                exposure['class'] = np.where(
-                    exposure['class'] >= i+1, i+1, exposure['class'])
-        logger.info(f"{convert_dict} convert_dict")
-        exposure['class'].replace(convert_dict, inplace=True)
+                exposure[haz_class_field] = np.where(
+                    exposure[haz_class_field] >= i+1, i+1, exposure[haz_class_field])
+                
+        exposure[haz_class_field].replace(convert_dict, inplace=True)
         return True,exposure,convert_dict
     except Exception as e:
         return False,str(e),None    
 
-def getSummary(con, exposureid, column='areaOrLen', agg=False):
+def getSummary(con, exposureid, column='areaOrLen', aggregation=None):
     try:
         if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
             raise ValueError(
@@ -42,7 +41,6 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         exposure = readvector.prepareExposureForLoss(con, exposureid)
         hazid = metadata['hazid']
         classificationScheme = readmeta.classificationscheme(con, hazid)
-        logger.info(f"{classificationScheme} classificationScheme")
         thresholds=classificationScheme['val1'].unique()
         thresholds.sort()
         min_thresholds=[float(val) for val in thresholds]
@@ -53,25 +51,37 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         else:
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result}")
             
-        logger.info(f"{exposure.columns} column after add_hazard_class_result")
         # exposure['class'].replace(convert_dict, inplace=True)
         
         # if column is count just count the number of feature exposed
         # if column == 'count':
         #     exposure[column] = 1
             
-        if not agg:
-            summary = pd.pivot_table(exposure, values=column, index=[type_col],
-                                    columns=["class"], aggfunc=np.sum, fill_value=0)
-            summary = summary.reset_index()
-            summary = summary.rename(columns={type_col: "Ear Class"})
-            
-        else:
+        if aggregation=="ear_admin_wise":
             summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
                                     columns=["class"], aggfunc=np.sum, fill_value=0)
             summary = summary.reset_index()
             summary = summary.rename(
                 columns={type_col: "Ear Class", "admin_id": "Admin Name"})
+            
+        elif aggregation=="admin_wise":
+            summary = pd.pivot_table(exposure, values=column, index=['admin_id'],
+                                    columns=["class"], aggfunc=np.sum, fill_value=0)
+            summary = summary.reset_index()
+            summary = summary.rename(
+                columns={"admin_id": "Admin Name"})
+        else:
+            summary = pd.pivot_table(exposure, values=column, index=[type_col],
+                                    columns=["class"], aggfunc=np.sum, fill_value=0)
+            summary = summary.reset_index()
+            summary = summary.rename(columns={type_col: "Ear Class"})
+            
+        # else:
+        #     summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
+        #                             columns=["class"], aggfunc=np.sum, fill_value=0)
+        #     summary = summary.reset_index()
+        #     summary = summary.rename(
+        #         columns={type_col: "Ear Class", "admin_id": "Admin Name"})
         summary = summary.fillna(0)
         #to drop column 0.0 if exists
         if 0.0 in summary.columns:
@@ -91,7 +101,7 @@ def getSummary(con, exposureid, column='areaOrLen', agg=False):
         raise Exception(f"Error in getSummary {str(e)}")
 
 
-def getShapefile(con, exposureid, column='areaOrLen', agg=False):
+def getShapefile(con, exposureid, column='areaOrLen', aggregation=None):
     try:
         if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
             raise ValueError(
@@ -116,7 +126,9 @@ def getShapefile(con, exposureid, column='areaOrLen', agg=False):
         # if column is count just count the number of feature exposed
         # if column == 'count':
         #     exposure[column] = 1
-        if not agg:
+        
+        # if not agg:
+        if aggregation=="individual_ear_class":
             summary = pd.pivot_table(exposure, values=column, index=['geom_id'],
                                     columns=["class"], aggfunc=np.sum, fill_value=0)
             ear = readvector.readear(con, earid)
@@ -132,6 +144,7 @@ def getShapefile(con, exposureid, column='areaOrLen', agg=False):
             summary = pd.merge(left=summary, right=admin,
                             left_on='admin_id', right_on=adminpk, right_index=False,how='right')
             summary = gpd.GeoDataFrame(summary, geometry='geom')
+            
         summary = summary.fillna(0)
         #to drop column 0.0 if exists
         if 0.0 in summary.columns:
@@ -151,7 +164,7 @@ def getShapefile(con, exposureid, column='areaOrLen', agg=False):
    # **********************BELOW FUNCTIONS ARE FOR RELATIVE VALUES, ***************************
 
 
-def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
+def getSummaryRel(con, exposureid, column='areaOrLen', aggregation=None):
     try:
         if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
             raise ValueError(
@@ -181,17 +194,30 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
             exposure['default_count']=1
         else:
             raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result}")
-        if not agg:
-            summary = pd.pivot_table(exposure, values=column, index=[type_col],
-                                    columns=["class"], aggfunc=np.sum, fill_value=0)
-            agg = exposure[[aggcolumn, type_col]].groupby(type_col).sum()
-            summary = pd.merge(left=summary, right=agg,
-                            left_on=type_col, right_on=type_col)
-            summary[summary.columns.difference([aggcolumn])] = summary[summary.columns.difference([
-                aggcolumn])].div(summary[aggcolumn], axis=0)*100
-            summary = summary.reset_index()
-            summary = summary.rename(columns={type_col: "Ear Class"})
-        else:
+        # if not agg:
+        #     summary = pd.pivot_table(exposure, values=column, index=[type_col],
+        #                             columns=["class"], aggfunc=np.sum, fill_value=0)
+        #     agg = exposure[[aggcolumn, type_col]].groupby(type_col).sum()
+        #     summary = pd.merge(left=summary, right=agg,
+        #                     left_on=type_col, right_on=type_col)
+        #     summary[summary.columns.difference([aggcolumn])] = summary[summary.columns.difference([
+        #         aggcolumn])].div(summary[aggcolumn], axis=0)*100
+        #     summary = summary.reset_index()
+        #     summary = summary.rename(columns={type_col: "Ear Class"})
+        # else:
+        #     summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
+        #                             columns=["class"], aggfunc=np.sum, fill_value=0)
+        #     agg = exposure[[aggcolumn, type_col, 'admin_id']
+        #                 ].groupby([type_col, 'admin_id']).sum()
+        #     summary = pd.merge(summary, agg, 'left', on=['admin_id', type_col])
+        #     summary[summary.columns.difference([aggcolumn])] = summary[summary.columns.difference([
+        #         aggcolumn])].div(summary[aggcolumn], axis=0)*100
+
+        #     summary = summary.reset_index()
+        #     summary = summary.rename(
+        #         columns={type_col: "Ear Class", "admin_id": "Admin Name"})
+            
+        if aggregation=="ear_admin_wise":
             summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
                                     columns=["class"], aggfunc=np.sum, fill_value=0)
             agg = exposure[[aggcolumn, type_col, 'admin_id']
@@ -203,6 +229,31 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
             summary = summary.reset_index()
             summary = summary.rename(
                 columns={type_col: "Ear Class", "admin_id": "Admin Name"})
+            
+        elif aggregation=="admin_wise":
+            summary = pd.pivot_table(exposure, values=column, index=['admin_id'],
+                                    columns=["class"], aggfunc=np.sum, fill_value=0)
+            agg = exposure[[aggcolumn, 'admin_id']
+                        ].groupby(['admin_id']).sum()
+            summary = pd.merge(summary, agg, 'left', on=['admin_id'])
+            summary[summary.columns.difference([aggcolumn])] = summary[summary.columns.difference([
+                aggcolumn])].div(summary[aggcolumn], axis=0)*100
+
+            summary = summary.reset_index()
+            summary = summary.rename(
+                columns={"admin_id": "Admin Name"})
+        else:
+            summary = pd.pivot_table(exposure, values=column, index=[type_col],
+                                    columns=["class"], aggfunc=np.sum, fill_value=0)
+            agg = exposure[[aggcolumn, type_col]].groupby(type_col).sum()
+            summary = pd.merge(left=summary, right=agg,
+                            left_on=type_col, right_on=type_col)
+            summary[summary.columns.difference([aggcolumn])] = summary[summary.columns.difference([
+                aggcolumn])].div(summary[aggcolumn], axis=0)*100
+            summary = summary.reset_index()
+            summary = summary.rename(columns={type_col: "Ear Class"})
+            
+            
         summary = summary.fillna(0)
         #to drop column 0.0 if exists
         if 0.0 in summary.columns:
@@ -222,7 +273,7 @@ def getSummaryRel(con, exposureid, column='areaOrLen', agg=False):
         raise Exception(f"Error in getSummary {str(e)}")
 
 
-def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
+def getShapefileRel(con, exposureid, column='areaOrLen', aggregation=None):
     try:
         if column not in ['areaOrLen', 'value_exposure', 'population_exposure', 'count']:
             raise ValueError(
@@ -262,7 +313,7 @@ def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
         # if column == 'count':
         #     exposure[column] = 1
 
-        if not agg:
+        if aggregation=="individual_ear_class":
             # this is always relative
             summary = pd.pivot_table(exposure, values=column, index=['geom_id'],
                                     columns=["class"], aggfunc=np.sum, fill_value=0)
@@ -301,3 +352,86 @@ def getShapefileRel(con, exposureid, column='areaOrLen', agg=False):
         return summary
     except Exception as e:
         raise Exception(f"Error in getSummary {str(e)}")
+
+def getGriddedExposureSummary(con, exposure_id, column='total_area_exposed', aggregation=None):
+    # def getGriddedExposureSummary(con, exposure_id, column='total_area_exposed', agg=False,agg_func=False):
+    '''
+    aggregation: individual_ear_class,admin_wise,ear_admin_wise
+    '''
+    try:
+        if column not in ['total_pixel_exposed', 'total_area_exposed', 'relative_exposed']:
+            raise ValueError(
+                "column: status must be one of total_pixel_exposed, total_area_exposed or relative_exposed")
+
+        metadata = readmeta.computeloss_meta(con, exposure_id)
+        schema=metadata['Schema']
+        
+        get_exp_data_success, get_exp_response = readvector.read_raster_exposure(con, exposure_id,schema)
+        if get_exp_data_success:
+            exposure=get_exp_response
+        else:
+             raise Exception(f"Error in get exposure data: {get_exp_response}")
+        
+        hazid = metadata['hazid']
+        classificationScheme = readmeta.classificationscheme(con, hazid)
+        thresholds=classificationScheme['val1'].unique()
+        thresholds.sort()
+        min_thresholds=[float(val) for val in thresholds]
+        type_col = "ear_name" #metadata["TypeColumn"]
+        response,add_hazard_class_result,hazard_class_dict=add_hazard_class(exposure,min_thresholds,classificationScheme,"hazard_name")
+        
+        if response:
+            exposure=add_hazard_class_result
+        else:
+            raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result}")
+        if aggregation=='ear_admin_wise':
+            # if agg:
+            summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
+                                    columns=["hazard_name"],  fill_value=0) #aggfunc=np.sum,
+            summary = summary.reset_index()
+            summary = summary.rename(
+                columns={type_col: "Ear Class", "admin_id": "Admin Name"})
+        
+        elif aggregation=='admin_wise':
+            # if agg:
+            summary = pd.pivot_table(exposure, values=column, index=['admin_id'],
+                                    columns=["hazard_name"],  fill_value=0) #aggfunc=np.sum,
+            summary = summary.reset_index()
+            summary = summary.rename(
+                columns={type_col: "Ear Class", "admin_id": "Admin Name"})
+        else: 
+            #Non aggregation and individual_ear_class
+            summary = pd.pivot_table(exposure, values=column, index=[type_col],
+                                    columns=["hazard_name"], aggfunc=np.sum, fill_value=0) #aggfunc=np.sum,
+            summary = summary.reset_index()
+            summary = summary.rename(
+                columns={type_col: "Ear Class"})
+            # summary = pd.pivot_table(exposure, values=column, index=[type_col],
+            #                         columns=["hazard_name"], fill_value=0) #aggfunc=np.sum, 
+            # summary = summary.reset_index()
+            # summary = summary.rename(columns={type_col: "Ear Class"})
+            
+        # elif aggregation=='individual_ear_class':
+        # # elif agg_func:
+        #     summary = pd.pivot_table(exposure, values=column, index=[type_col],
+        #                             columns=["hazard_name"], aggfunc=np.sum, fill_value=0) #aggfunc=np.sum,
+        #     summary = summary.reset_index()
+        #     summary = summary.rename(
+        #         columns={type_col: "Ear Class"})
+            
+        summary = summary.fillna(0)
+        #to drop column 0.0 if exists
+        if 0.0 in summary.columns:
+            summary = summary.drop(0.0, axis=1)
+        #Add missing hazard class in table
+        for values in hazard_class_dict.values():
+            if values not in summary.columns:
+                summary[values]=0
+        other_columns = [col for col in summary.columns if col not in hazard_class_dict.values()]
+        desired_columns_order=other_columns+list(hazard_class_dict.values())
+        # Step 5: Reorder the columns using reindex with the desired_order followed by the remaining columns
+        summary = summary.reindex(columns=desired_columns_order)
+        return True, summary
+    except Exception as e:
+        return False, str(e)
+        # raise Exception(f"Error in getSummary {str(e)}")

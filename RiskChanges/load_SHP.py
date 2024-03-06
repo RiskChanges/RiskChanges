@@ -1,8 +1,8 @@
 import geopandas
 from sqlalchemy import *
 import random
-import logging
-logger = logging.getLogger(__file__)
+# import logging
+# logger = logging.getLogger(__file__)
 
 #! mention all default column in exposure, loss and risk result
 def loadshp(shpInput, engine, lyrName, schema, index,calcAreaOrLen=False,shp_gdf=geopandas.GeoDataFrame()):
