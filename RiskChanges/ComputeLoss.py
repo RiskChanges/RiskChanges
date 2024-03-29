@@ -185,3 +185,97 @@ def ComputeLoss(con, exposureid, lossid, computecol='counts', **kwargs):
     # common tasks for both results
     loss['loss_id'] = lossid
     writevector.writeLoss(loss, con, schema)
+
+def ComputeRasterLoss(con, exposureid, lossid, computecol='counts', **kwargs):
+    try:
+        # computeonvalue column has been changed from computation column where 'Cost','Population','Geometry','Count' should be passed.
+        is_aggregated = kwargs.get('is_aggregated', False)
+        onlyaggregated = kwargs.get('only_aggregated', False)
+        adminid = kwargs.get('adminunit_id', None)
+
+        metadata = readmeta.computeloss_meta(con, exposureid)
+        exposure = readvector.prepareExposureForLoss(con, exposureid)
+        base = float(metadata["base"]) or 0
+        threshold = float(metadata["threshold"])
+        stepsize = float(metadata["stepsize"])
+        haztype = metadata["hazintensity"]
+        hazunit = metadata["hazunit"]
+        vulnColumn = metadata["vulnColumn"]
+        schema = metadata["Schema"]
+        spprob = metadata["spprob"]
+        spprob_single = metadata["spprob_single"]
+        
+        '''
+        read exposure layer
+        band_1 ear
+        band 2 hazard
+        read band_1
+        read band 2
+        create np with vul values
+        calculate loss pixel_area*vul_values for land cover
+        
+        '''
+        
+        
+        if hazunit !="classes":
+            exposure = getHazardMeanIntensity(exposure, stepsize, base, threshold)
+            
+        exposure = estimatevulnerability(exposure, haztype,hazunit, vulnColumn, con)
+        
+        if computecol == 'Cost':
+            costColumn = metadata["costColumn"]
+        elif computecol == 'Population':
+            costColumn = metadata["populColumn"]
+        elif computecol == 'Geometry':
+            costColumn = 'areaOrLen'
+        else:
+            exposure['counts'] = 1
+            costColumn = 'counts'
+        # if spprob == None:
+        #     loss = calculateLoss(exposure, costColumn)
+        if spprob_single:
+            loss = calculateLoss(exposure, costColumn)
+        else:
+            loss = calculateLoss_spprob(exposure, costColumn, spprob,hazunit)
+
+        if is_aggregated:
+            admin_unit = readvector.readAdmin(con, adminid)
+            admin_unit = gpd.GeoDataFrame(admin_unit, geometry="geom")
+            earid = metadata["earID"]
+            earpk = metadata['earPK']
+            adminmeta = readmeta.getAdminMeta(con, adminid)
+            adminpk = adminmeta.col_admin[0] or adminmeta.data_id[0]
+            admin_dataid = adminmeta.data_id[0]
+            ear = readvector.readear(con, earid)
+            loss = pd.merge(left=loss, right=ear[[
+                            earpk, 'geom']], left_on='geom_id', right_on=earpk, right_index=False)
+            loss = gpd.GeoDataFrame(loss, geometry='geom')
+
+            # check whether adminpk and ear columns have same name, issue #80
+            df_columns = list(loss.columns)
+            if adminpk in df_columns:
+                loss = loss.rename(columns={adminpk: f"{adminpk}_ear"})
+
+            loss = aggregator.aggregateloss(
+                loss, admin_unit, adminpk, admin_dataid)
+            loss = loss.rename(
+                columns={adminpk: 'admin_id', admin_dataid: "geom_id"})
+            #merging the data to include all admin unit
+            loss= pd.merge(left=loss, right=admin_unit[[adminpk,
+                            admin_dataid]], left_on='geom_id', right_on=admin_dataid, right_index=False, how="right")
+            loss=loss.drop(columns= ['geom_id','admin_id'])
+            loss = loss.rename(
+                columns={admin_dataid: "geom_id",adminpk:"admin_id"})
+            loss=loss.fillna(0)
+            assert not loss.empty, f"The aggregated dataframe in loss returned empty"
+
+        # Non aggrigated case
+        else:
+            loss['admin_id'] = ''
+
+        # common tasks for both results
+        loss['loss_id'] = lossid
+        writevector.writeLoss(loss, con, schema)
+        return True,"success"
+    except Exception as e:
+        return False, str(e)

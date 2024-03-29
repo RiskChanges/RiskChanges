@@ -149,3 +149,56 @@ def getAdminMeta(connstr,adminid):
     engine.close()
     assert not metatable.empty , f"The admin unit id {adminid} do not exists"
     return metatable
+
+def getHazardIntensityClasses(connstr,hazard_id):
+    '''
+    Using this function in loss calculation output save in database
+    '''
+    try: 
+        engine=psycopg2.connect(connstr)
+    except :
+        print("unable to create connection")
+    sql_val=f'SELECT * FROM public."projectIndex_intensityclass" as intensityclass WHERE intensityclass.hazard_id={hazard_id};'
+    hazard_intensity_classes=pd.read_sql(sql_val,engine)
+    engine.close()
+    assert not hazard_intensity_classes.empty , f"The IntensityClasses with hazard id {hazard_id} do not exists"
+    return hazard_intensity_classes
+
+def getEarClassAlias(connstr,ear_id):
+    '''
+    Using this function in loss calculation output save in database
+    '''
+    try: 
+        engine=psycopg2.connect(connstr)
+    except :
+        print("unable to create connection")
+    sql_val=f'SELECT * FROM public."projectIndex_earclassalias" as earclassalias WHERE earclassalias.ear_id={ear_id};'
+    ear_class_alias=pd.read_sql(sql_val,engine)
+    engine.close()
+    assert not ear_class_alias.empty , f"The EarClassAlias with ear id {ear_id} do not exists"
+    return ear_class_alias
+
+def getRasterEarDiscreteClass(connstr,ear_id):
+    '''
+    Using this function in loss calculation output save in database
+    '''
+    try: 
+        engine=psycopg2.connect(connstr)
+    except :
+        print("unable to create connection")
+    sql_val=f'SELECT * FROM public."projectIndex_rastereardiscreteclass" as discreteclass WHERE discreteclass.ear_id={ear_id};'
+    discrete_class=pd.read_sql(sql_val,engine)
+    engine.close()
+    assert not discrete_class.empty , f"The EarClassAlias with ear id {ear_id} do not exists"
+    return discrete_class
+
+def getRasterEarMeta(connstr,earid):
+    try: 
+        engine=psycopg2.connect(connstr)
+    except :
+        print("unable to create connection")
+    sql_val=f'SELECT * FROM public."projectIndex_rasterearindexmetadata" as metadata WHERE metadata.ear_id={earid};'
+    metatable=pd.read_sql(sql_val,engine)
+    engine.close()
+    assert not metatable.empty , f"The EAR id {earid} do not exists"
+    return metatable
