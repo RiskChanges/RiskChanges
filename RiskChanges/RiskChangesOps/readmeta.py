@@ -202,3 +202,14 @@ def getRasterEarMeta(connstr,earid):
     engine.close()
     assert not metatable.empty , f"The EAR id {earid} do not exists"
     return metatable
+
+def getCostBenefitAnalysisMeta(connstr,id):
+    try: 
+        engine=psycopg2.connect(connstr)
+    except :
+        print("unable to create connection")
+    sql_val=f'SELECT * FROM public."comparision_costbenefitanalysis" as metadata WHERE metadata.id={id};'
+    metatable=pd.read_sql(sql_val,engine)
+    engine.close()
+    assert not metatable.empty , f"The CostBenefitAnalysis id {id} do not exists"
+    return metatable
