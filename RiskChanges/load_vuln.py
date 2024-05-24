@@ -1,7 +1,12 @@
 from sqlalchemy import *
 import pandas as pd
 
+'''
+Note: Not in use in backend but required in package
 
+TODO: 
+    - check whether upladed csv is matched with template (column_names, first row data 0, file extension) as in VulnerabilityIndexViewSet
+'''
 def loadvuln(csv_dir, vulnID, connstr, vuln_point_table="vulnIndex"):
     df = pd.read_csv(csv_dir)
     if df.columns.to_list()[0].isdigit():
