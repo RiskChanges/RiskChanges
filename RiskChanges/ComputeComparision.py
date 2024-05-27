@@ -3,8 +3,68 @@ import pandas as pd
 import numpy_financial as npf
 import json
 import numpy as np
-# import logging
-# logger = logging.getLogger(__file__)
+
+
+def GenerateCostBenefitTable(investment_collection,maintenance_collection,risk_reduction_collection):
+    try:
+        if isinstance(investment_collection, str):
+            investment_collection=json.loads(investment_collection)
+            
+        if maintenance_collection and isinstance(maintenance_collection, str):
+            maintenance_collection=json.loads(maintenance_collection)
+            
+        if isinstance(risk_reduction_collection, str):
+            risk_reduction_collection=json.loads(risk_reduction_collection)
+            
+        df = pd.DataFrame(columns=['year', 'cost', 'risk_reduction','incremental_benefit']) 
+        
+        for investment in investment_collection:
+            investment_end_year=investment['end_year'] if investment['end_year'] else investment['start_year']
+            for i in range(investment['start_year'], investment_end_year+1):
+                if i in df['year'].values:
+                    df.loc[df['year'] == i, 'cost'] += investment['investment_per_year']
+                else:
+                    data = {"year": i, 'cost': investment['investment_per_year'], 'risk_reduction': 0, 'incremental_benefit': 0}
+                    df = pd.concat([df, pd.DataFrame(data, index=[0])], ignore_index=True)
+                
+        for value in maintenance_collection:
+            maintenance_end_year=value['end_year'] if value['end_year'] else value['start_year']
+            for i in range(value['start_year'], maintenance_end_year+1):
+                if i in df['year'].values:
+                    df.loc[df['year'] == i, 'cost'] += value['cost_per_year']
+                else:
+                    data = {"year": i, 'cost': value['cost_per_year'], 'risk_reduction': 0, 'incremental_benefit': 0}
+                    df = pd.concat([df, pd.DataFrame(data, index=[0])], ignore_index=True)
+                    
+        for value in risk_reduction_collection:
+            if "interpolation_method" in value.keys():
+                start_value=value['start_year_reduction']
+                end_value=value['end_year_reduction']
+                intermediate_values_no=value['end_year']-value['start_year']-1
+                intermediate_values = np.linspace(start_value, end_value, intermediate_values_no+2)[1:-1]
+                intermediate_values=[start_value]+intermediate_values.tolist()+[end_value]
+
+                for index,i in enumerate(range(value['start_year'], value['end_year']+1)):
+                    if i in df['year'].values:
+                        df.loc[df['year'] == i, 'risk_reduction'] = intermediate_values[index]
+                    else:
+                        data = {"year": i, 'cost': 0, 'risk_reduction': intermediate_values[index], 'incremental_benefit': 0}
+                        df = pd.concat([df, pd.DataFrame(data, index=[0])], ignore_index=True)
+            else:
+                risk_reduction_end_year=value['end_year'] if value['end_year'] else value['start_year']
+                for i in range(value['start_year'], risk_reduction_end_year+1):
+                    if i in df['year'].values:
+                        df.loc[df['year'] == i, 'risk_reduction'] = value['reduction_per_year']
+                    else:
+                        data = {"year": i, 'cost': 0, 'risk_reduction': value['reduction_per_year'], 'incremental_benefit': 0}
+                        df = pd.concat([df, pd.DataFrame(data, index=[0])], ignore_index=True)
+                    
+        df['incremental_benefit']=df['risk_reduction']-df['cost']
+        return True, df
+    except Exception as e:
+        return False, str(e)
+        # pass
+
 
 def CalculateCostBenefit(**kwargs):
 # def CalculateCostBenefit(con, cost_benefit_id, **kwargs):
@@ -65,90 +125,14 @@ def CalculateCostBenefit(**kwargs):
         maintenance_collection = kwargs.get('maintenance_collection', None)
         risk_reduction_collection = kwargs.get('risk_reduction_collection', None)
         
-        if isinstance(investment_collection, str):
-            investment_collection=json.loads(investment_collection)
-            
-        if maintenance_collection and isinstance(maintenance_collection, str):
-            maintenance_collection=json.loads(maintenance_collection)
-            
-        if isinstance(risk_reduction_collection, str):
-            risk_reduction_collection=json.loads(risk_reduction_collection)
-            
         if discounting_rate and isinstance(discounting_rate, str):
             discounting_rate=float(discounting_rate)
+            
+        gen_cb_table_success, response=GenerateCostBenefitTable(investment_collection,maintenance_collection,risk_reduction_collection)
+        if gen_cb_table_success==False:
+            return False, response, None, None, None
         
-        df = pd.DataFrame(columns=['year', 'cost', 'risk_reduction','incremental_benefit']) 
-        
-        
-        # for investment in investment_collection:
-        #     for i in range(investment['start_year'], investment['start_year']+investment['period']):
-        #         if i in df['year'].values:
-        #             df.loc[df['year'] == i, 'cost'] += investment['investment_per_year']
-        #         else:
-        #             data = {"year": i, 'cost': investment['investment_per_year'], 'risk_reduction': 0, 'incremental_benefit': 0}
-        #             df = pd.concat([df, pd.DataFrame(data, index=[0])], ignore_index=True)
-        # if maintenance_collection:    
-        #     for value in maintenance_collection:
-        #         for i in range(value['start_year'], value['start_year']+value['period']):
-        #             if i in df['year'].values:
-        #                 df.loc[df['year'] == i, 'cost'] += value['cost_per_year']
-        #             else:
-        #                 data = {"year": i, 'cost': value['cost_per_year'], 'risk_reduction': 0, 'incremental_benefit': 0}
-        #                 df = pd.concat([df, pd.DataFrame(data, index=[0])], ignore_index=True)
-                    
-        # for value in risk_reduction_collection:
-        #     for i in range(value['start_year'], value['start_year']+value['period']):
-        #         if i in df['year'].values:
-                    
-        #             df.loc[df['year'] == i, 'risk_reduction'] += value['reduction_per_year']
-        #         else:
-        #             data = {"year": i, 'cost': 0, 'risk_reduction': value['reduction_per_year'], 'incremental_benefit': 0}
-        #             df = pd.concat([df, pd.DataFrame(data, index=[0])], ignore_index=True)
-        
-        for investment in investment_collection:
-            investment_end_year=investment['end_year'] if investment['end_year'] else investment['start_year']
-            for i in range(investment['start_year'], investment_end_year+1):
-                if i in df['year'].values:
-                    df.loc[df['year'] == i, 'cost'] += investment['investment_per_year']
-                else:
-                    data = {"year": i, 'cost': investment['investment_per_year'], 'risk_reduction': 0, 'incremental_benefit': 0}
-                    df = pd.concat([df, pd.DataFrame(data, index=[0])], ignore_index=True)
-                
-        for value in maintenance_collection:
-            maintenance_end_year=value['end_year'] if value['end_year'] else value['start_year']
-            for i in range(value['start_year'], maintenance_end_year+1):
-                if i in df['year'].values:
-                    df.loc[df['year'] == i, 'cost'] += value['cost_per_year']
-                else:
-                    data = {"year": i, 'cost': value['cost_per_year'], 'risk_reduction': 0, 'incremental_benefit': 0}
-                    df = pd.concat([df, pd.DataFrame(data, index=[0])], ignore_index=True)
-                    
-        for value in risk_reduction_collection:
-            if "interpolation_method" in value.keys():
-                start_value=value['start_year_reduction']
-                end_value=value['end_year_reduction']
-                intermediate_values_no=value['end_year']-value['start_year']-1
-                intermediate_values = np.linspace(start_value, end_value, intermediate_values_no+2)[1:-1]
-                intermediate_values=[start_value]+intermediate_values.tolist()+[end_value]
-
-                for index,i in enumerate(range(value['start_year'], value['end_year']+1)):
-                    if i in df['year'].values:
-                        df.loc[df['year'] == i, 'risk_reduction'] = intermediate_values[index]
-                    else:
-                        data = {"year": i, 'cost': 0, 'risk_reduction': intermediate_values[index], 'incremental_benefit': 0}
-                        df = pd.concat([df, pd.DataFrame(data, index=[0])], ignore_index=True)
-            else:
-                risk_reduction_end_year=value['end_year'] if value['end_year'] else value['start_year']
-                for i in range(value['start_year'], risk_reduction_end_year+1):
-                    if i in df['year'].values:
-                        df.loc[df['year'] == i, 'risk_reduction'] = value['reduction_per_year']
-                    else:
-                        data = {"year": i, 'cost': 0, 'risk_reduction': value['reduction_per_year'], 'incremental_benefit': 0}
-                        df = pd.concat([df, pd.DataFrame(data, index=[0])], ignore_index=True)
-                    
-                    
-                    
-        df['incremental_benefit']=df['risk_reduction']-df['cost']
+        df=response
         incremental_benefit_list=[0]+df['incremental_benefit'].tolist()
         
         if discounting_rate:
@@ -157,6 +141,6 @@ def CalculateCostBenefit(**kwargs):
         np_irr=npf.irr(incremental_benefit_list)
         cb_ratio=sum(df['cost'])/sum(df['incremental_benefit'])
         return True, "success",cb_ratio, np_npv, np_irr*100
-    
     except Exception as e:
         return False, str(e), None, None, None
+
