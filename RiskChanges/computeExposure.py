@@ -12,9 +12,31 @@ from rasterio.io import MemoryFile
 import rasterio
 from rasterio.enums import Resampling
 from numpy import save as np_save
+import dask.array as da
+from concurrent.futures import ThreadPoolExecutor
+import threading
+import time
+import psutil
+import datetime
+
 # import logging
 # logger = logging.getLogger(__file__)
 import os
+
+def memory_full(threshold=90):
+    memory = psutil.virtual_memory()
+    return memory.percent >= threshold
+
+def monitor_memory(pause_event, threshold=90, check_interval=1):
+    while True:
+        if memory_full(threshold):
+            print("Memory full, pausing threads")
+            pause_event.set()
+        else:
+            if pause_event.is_set():
+                print("Memory usage reduced, resuming threads")
+                pause_event.clear()
+        time.sleep(check_interval)
 
 def polygonExposure(ear, haz, expid, Ear_Table_PK):
     df = pd.DataFrame()
@@ -300,7 +322,6 @@ def ComputeExposure(con, earid, hazid, expid, **kwargs):
     else:
         df['admin_id'] = ''
         
-        
     # # check the geometry and run the corresponding calcualtion function
     # if (geometrytype == 'Polygon' or geometrytype == 'MultiPolygon'):
     #     ear['areacheck'] = ear.geom.area
@@ -437,6 +458,7 @@ assert vectorops.cehckprojection(
    ear, haz), "The hazard and EAR do not have same projection system please check it first"
 ''' 
 
+
 def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
     '''
     TODO:
@@ -451,6 +473,7 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
     
     remove ear_alias dependency
     '''
+    print("Compute raster exposure calculation called-------------------------**")
     ear_metadata=None
     hazard_metadata=None
     
@@ -463,6 +486,7 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
         
         haz_file = kwargs.get('haz_file', None)
         ear_file = kwargs.get('ear_file', None)
+        num_cores= kwargs.get('num_cores', 1)
         
         hazard_intensity_classes=[]
         ear_classes=[]
@@ -471,7 +495,7 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
             ear_class_alias = kwargs.get('ear_class_alias', None)
             hazard_raster = readhaz(con, hazid, haz_file)
             ear_raster = rasterio.open(ear_file) #handle this
-        elif ear_interpolation=="Discrete":
+        elif ear_interpolation=="Discrete" or ear_interpolation=="Linear":
             ear_raster = rasterio.open(ear_file) #handle this
             hazard_raster = rasterio.open(haz_file) #handle this
             
@@ -502,14 +526,29 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
         resampled_ear_height=int((ear_raster.height * ear_raster.res[1]) / final_y_res)
         
         # Resample the source raster to match the target resolution
-        resampled_haz_data = hazard_raster.read(
-            out_shape=(hazard_raster.count, resampled_haz_height, resampled_haz_width),
-            resampling=Resampling.nearest
-        )
-        resampled_ear_data = ear_raster.read(
-            out_shape=(ear_raster.count, resampled_ear_height, resampled_ear_width),
-            resampling=Resampling.nearest
-        )
+        def resample_data(raster,height, width):
+            resampled_data = raster.read(
+                out_shape=(raster.count, height, width),
+                resampling=Resampling.nearest
+                )
+            return resampled_data
+        print("Compute raster exposure calculation called-------------------------2")
+        with ThreadPoolExecutor() as executor:
+            future_hazard = executor.submit(resample_data, hazard_raster, resampled_haz_height, resampled_haz_width)
+            future_ear = executor.submit(resample_data, ear_raster, resampled_ear_height, resampled_ear_width)            
+            resampled_haz_data = future_hazard.result()
+            resampled_ear_data = future_ear.result()
+        
+        print("Compute raster exposure calculation called-------------------------3")
+
+        # resampled_haz_data = hazard_raster.read(
+        #     out_shape=(hazard_raster.count, resampled_haz_height, resampled_haz_width),
+        #     resampling=Resampling.nearest
+        # )
+        # resampled_ear_data = ear_raster.read(
+        #     out_shape=(ear_raster.count, resampled_ear_height, resampled_ear_width),
+        #     resampling=Resampling.nearest
+        # )
         
         # Get x and y origin based on the original transformation
         haz_x_origin, haz_y_origin = hazard_raster.transform[2],hazard_raster.transform[5] 
@@ -526,7 +565,8 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
             'height': resampled_haz_height,
             'width': resampled_haz_width,
             'crs': hazard_raster.crs,  # Replace with your desired CRS
-            'transform': new_haz_transform
+            'transform': new_haz_transform,
+            'compress': 'lzw',
         }
         resampled_ear_meta = {
             'driver': 'GTiff',
@@ -535,25 +575,39 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
             'height': resampled_ear_height,
             'width': resampled_ear_width,
             'crs': ear_raster.crs,  # Replace with your desired CRS
-            'transform': new_ear_transform
+            'transform': new_ear_transform,
+            'compress': 'lzw',
         }
 
-        with MemoryFile() as memfile:
-            with memfile.open(**resampled_haz_meta) as dst:
-                dst.write(resampled_haz_data)
-            resampled_hazard_raster = memfile.open()
+        # with MemoryFile() as memfile:
+        #     with memfile.open(**resampled_haz_meta) as dst:
+        #         dst.write(resampled_haz_data)
+        #     resampled_hazard_raster = memfile.open()
             
-        with MemoryFile() as memfile:
-            with memfile.open(**resampled_ear_meta) as dst:
-                dst.write(resampled_ear_data)
-            resampled_ear_raster = memfile.open()
+        # with MemoryFile() as memfile:
+        #     with memfile.open(**resampled_ear_meta) as dst:
+        #         dst.write(resampled_ear_data)
+        #     resampled_ear_raster = memfile.open()
             
-        hazard_raster_data = resampled_hazard_raster.read(1)  # Read the first band of raster 1
-        ear_raster_data = resampled_ear_raster.read(1)  # Read the first band of raster 2
+        # hazard_raster_data = resampled_hazard_raster.read(1)  # Read the first band of raster 1
+        # ear_raster_data = resampled_ear_raster.read(1)  # Read the first band of raster 2
 
-        hazard_bounds = resampled_hazard_raster.bounds #Get the extent of hazard dataset
-        ear_bounds = resampled_ear_raster.bounds #Get the extent of hazard dataset
+        # hazard_bounds = resampled_hazard_raster.bounds #Get the extent of hazard dataset
+        # ear_bounds = resampled_ear_raster.bounds #Get the extent of hazard dataset
         
+        def read_resampled_raster(meta,data):
+            with MemoryFile() as memfile:
+                with memfile.open(**meta) as dst:
+                    dst.write(data)
+                resampled_raster = memfile.open()
+                raster_data = resampled_raster.read(1)
+                raster_bounds = resampled_raster.bounds
+            return resampled_raster,raster_data, raster_bounds
+        with ThreadPoolExecutor() as executor:
+            future_hazard = executor.submit(read_resampled_raster,resampled_haz_meta, resampled_haz_data)
+            future_ear = executor.submit(read_resampled_raster, resampled_ear_meta, resampled_ear_data)            
+            resampled_hazard_raster,hazard_raster_data, hazard_bounds = future_hazard.result()
+            resampled_ear_raster,ear_raster_data,ear_bounds = future_ear.result()
         # Calculate intersection bounds
         intersection_bounds = (
             max(ear_bounds.left, hazard_bounds.left),
@@ -562,12 +616,22 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
             min(ear_bounds.top, hazard_bounds.top)
         )
         hazard_window = resampled_hazard_raster.window(*intersection_bounds)
-        hazard_row_off,hazard_col_off = int(hazard_window.row_off), int(hazard_window.col_off)
         hazard_height,hazard_width = int(hazard_window.height), int(hazard_window.width)
+        hazard_row_off,hazard_col_off = int(hazard_window.row_off), int(hazard_window.col_off)
         
         ear_window = resampled_ear_raster.window(*intersection_bounds)
         ear_row_off, ear_col_off = int(ear_window.row_off), int(ear_window.col_off)
         ear_height,ear_width  = int(ear_window.height), int(ear_window.width)
+        
+        # Adjust heights to be equal
+        if hazard_height != ear_height:
+            min_height = min(hazard_height, ear_height)
+            hazard_height = ear_height = min_height
+
+        # Adjust widths to be equal
+        if hazard_width != ear_width:
+            min_width = min(hazard_width, ear_width)
+            hazard_width = ear_width = min_width
         
         clipped_hazard_raster_data = hazard_raster_data[hazard_row_off:(hazard_row_off + hazard_height), hazard_col_off:(hazard_col_off + hazard_width)]
         clipped_ear_raster_data = ear_raster_data[ear_row_off:(ear_row_off + ear_height), ear_col_off:(ear_col_off + ear_width)]
@@ -590,6 +654,7 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
             'width': hazard_width,
             'crs': hazard_raster.crs,  # Replace with your desired CRS
             'transform': new_haz_transform,
+            # 'compress': 'lzw',
         }
         clipped_ear_meta = {
             'driver': 'GTiff',
@@ -599,125 +664,176 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
             'width': ear_width,
             'crs': ear_raster.crs,  # Replace with your desired CRS
             'transform': new_ear_transform,
+            # 'compress': 'lzw',
         }
-        
-        #create empty dataframe
         total_pixel_count=ear_height*ear_width
         if admin_id:
-            df = pd.DataFrame(columns=["hazard_name", "ear_name", "total_pixel_exposed","total_area_exposed","relative_exposed","admin_id"])
-
-            with MemoryFile() as memfile:
-                with memfile.open(**clipped_haz_meta) as dst:
-                    dst.write(clipped_hazard_raster_data,1)
-                clipped_hazard_raster = memfile.open()
-                
-            with MemoryFile() as memfile:
-                with memfile.open(**clipped_ear_meta) as dst:
-                    dst.write(clipped_ear_raster_data,1)
-                clipped_ear_raster = memfile.open()
-                
-            admin_df = readAdmin(con, admin_id)
-            adminmeta = readmeta.getAdminMeta(con, admin_id)
-            adminpk = adminmeta.col_admin[0] or adminmeta.data_id[0]
-            
-            for index, admin in admin_df.iterrows():
-                # Clip the raster data by the administrative unit's geometry
-                try:
-                    masked_hazard_raster_data, haz_out_transform = rasterio.mask.mask(clipped_hazard_raster, [admin.geom], crop=True, nodata=0, all_touched=False)
-                    masked_ear_raster_data, ear_out_transform = rasterio.mask.mask(clipped_ear_raster, [admin.geom], crop=True, nodata=0, all_touched=False)
-                except Exception as e:
-                    print(str(e),"mask error")
-                    continue
-                
-                has_nodata = np.isnan(masked_hazard_raster_data).any()  
-                if has_nodata:
-                    masked_hazard_raster_data = np.nan_to_num(masked_hazard_raster_data, nan=0.0)
-                nodata = resampled_hazard_raster.nodata
-                masked_hazard_raster_data[masked_hazard_raster_data == nodata]=0.0
-                # masked_hazard_raster_data = masked_hazard_raster_data[masked_hazard_raster_data != nodata] 
-                
-                #handeling nodata and nan value in ear datasets
-                has_nodata = np.isnan(masked_ear_raster_data).any()  
-                if has_nodata:
-                    masked_ear_raster_data = np.nan_to_num(masked_ear_raster_data, nan=0.0)
-                nodata = resampled_ear_raster.nodata
-                masked_ear_raster_data[masked_ear_raster_data == nodata]=0.0
-                # masked_ear_raster_data = masked_ear_raster_data[masked_ear_raster_data != nodata] 
+            try:
+                with MemoryFile() as memfile:
+                    with memfile.open(**clipped_haz_meta) as dst:
+                        dst.write(clipped_hazard_raster_data,1)
+                    clipped_hazard_raster = memfile.open()
                     
-                unique_ear_pixel_values=np.unique(masked_ear_raster_data)
-                unique_hazard_pixel_values=np.unique(masked_hazard_raster_data)
-                
-                
-                ear_data_shape = masked_ear_raster_data.shape
-                hazard_data_shape = masked_hazard_raster_data.shape
-                
-                if ear_data_shape != hazard_data_shape:
-                    # Ensure array shapes match along the second dimension
-                    if ear_data_shape[1] < hazard_data_shape[1]:
-                        # Pad masked_ear_raster_data with zeros to match array2's shape
-                        diff = masked_hazard_raster_data.shape[1] - masked_ear_raster_data.shape[1]
-                        padding = [(0, 0), (0, diff), (0, 0)]  # Pad along the second dimension
-                        masked_ear_raster_data = np.pad(masked_ear_raster_data, padding, mode='constant', constant_values=0)
-
-                    else:
-                        # Pad masked_hazard_raster_data with zeros to match masked_ear_raster_data's shape
-                        diff = masked_ear_raster_data.shape[1] - masked_hazard_raster_data.shape[1]
-                        padding = [(0, 0), (0, diff), (0, 0)]  # Pad along the second dimension
-                        masked_hazard_raster_data = np.pad(masked_hazard_raster_data, padding, mode='constant', constant_values=0)
+                with MemoryFile() as memfile:
+                    with memfile.open(**clipped_ear_meta) as dst:
+                        dst.write(clipped_ear_raster_data,1)
+                    clipped_ear_raster = memfile.open()
+                    
+                # print(clipped_hazard_raster.bounds,"clipped_hazard_bounds---------------")
+                # print(clipped_ear_raster.bounds,"clipped_ear_raster bounds....*******************************")
+                    
+                admin_df = readAdmin(con, admin_id)
+                adminmeta = readmeta.getAdminMeta(con, admin_id)
+                adminpk = adminmeta.col_admin[0] or adminmeta.data_id[0]
+                    
+                def process_admin_unit(admin):
+                    try:
+                        # print(clipped_hazard_raster)
+                        # print(clipped_ear_raster,"clipped_ear_raster")
+                        # print("admin parallel process start")
+                        result=[]
+                        while pause_event.is_set():
+                            time.sleep(1)
+                        try:
+                            # print(admin.geom)
+                            # print(clipped_hazard_raster,"33333333333333333333333333333333333333")
+                            # print(clipped_ear_raster,"2222222222222222222222222222222222222")
+                            # print(admin.geom,"111111111111111111111111111")
+                            # print(admin.geom.bounds,"geom bounds")
+                            masked_hazard_raster_data, haz_out_transform = rasterio.mask.mask(clipped_hazard_raster, [admin.geom], crop=True, nodata=0, all_touched=False)
+                            masked_ear_raster_data, ear_out_transform = rasterio.mask.mask(clipped_ear_raster, [admin.geom], crop=True, nodata=0, all_touched=False)
+                        except Exception as e:
+                            # print(str(e))
+                            return None
+                        print(masked_hazard_raster_data)
+                        print(masked_ear_raster_data)
+                        has_nodata = np.isnan(masked_hazard_raster_data).any()  
+                        if has_nodata:
+                            masked_hazard_raster_data = np.nan_to_num(masked_hazard_raster_data, nan=0.0)
+                            nodata = resampled_hazard_raster.nodata
+                            if nodata:
+                                masked_hazard_raster_data[masked_hazard_raster_data == nodata]=0.0
+                        # masked_hazard_raster_data = masked_hazard_raster_data[masked_hazard_raster_data != nodata] 
                         
-                    if ear_data_shape[2] < hazard_data_shape[2]:
-                        # Pad masked_ear_raster_data with zeros to match array2's shape
-                        diff =  hazard_data_shape[2] - ear_data_shape[2]
-                        padding = [(0, 0), (0, 0), (0, diff)]  # Pad along the second dimension
-                        masked_ear_raster_data = np.pad(masked_ear_raster_data, padding, mode='constant', constant_values=0)
+                        #handeling nodata and nan value in ear datasets
+                        has_nodata = np.isnan(masked_ear_raster_data).any()  
+                        if has_nodata:
+                            masked_ear_raster_data = np.nan_to_num(masked_ear_raster_data, nan=0.0)
+                            nodata = resampled_ear_raster.nodata
+                            if nodata:
+                                masked_ear_raster_data[masked_ear_raster_data == nodata]=0.0
+                        # masked_ear_raster_data = masked_ear_raster_data[masked_ear_raster_data != nodata] 
+                            
+                        unique_ear_pixel_values=np.unique(masked_ear_raster_data)
+                        unique_hazard_pixel_values=np.unique(masked_hazard_raster_data)
+                        
+                        
+                        ear_data_shape = masked_ear_raster_data.shape
+                        hazard_data_shape = masked_hazard_raster_data.shape
+                        
+                        if ear_data_shape != hazard_data_shape:
+                            # Ensure array shapes match along the second dimension
+                            if ear_data_shape[1] < hazard_data_shape[1]:
+                                # Pad masked_ear_raster_data with zeros to match array2's shape
+                                diff = masked_hazard_raster_data.shape[1] - masked_ear_raster_data.shape[1]
+                                padding = [(0, 0), (0, diff), (0, 0)]  # Pad along the second dimension
+                                masked_ear_raster_data = np.pad(masked_ear_raster_data, padding, mode='constant', constant_values=0)
 
-                    else:
-                        # Pad masked_hazard_raster_data with zeros to match masked_ear_raster_data's shape
-                        diff = ear_data_shape[2] -  hazard_data_shape[2]
-                        padding = [(0, 0), (0, 0), (0, diff)]  # Pad along the second dimension
-                        masked_hazard_raster_data = np.pad(masked_hazard_raster_data, padding, mode='constant', constant_values=0)
-               
-                if ear_interpolation=="Exact":
+                            else:
+                                # Pad masked_hazard_raster_data with zeros to match masked_ear_raster_data's shape
+                                diff = masked_ear_raster_data.shape[1] - masked_hazard_raster_data.shape[1]
+                                padding = [(0, 0), (0, diff), (0, 0)]  # Pad along the second dimension
+                                masked_hazard_raster_data = np.pad(masked_hazard_raster_data, padding, mode='constant', constant_values=0)
+                                
+                            if ear_data_shape[2] < hazard_data_shape[2]:
+                                # Pad masked_ear_raster_data with zeros to match array2's shape
+                                diff =  hazard_data_shape[2] - ear_data_shape[2]
+                                padding = [(0, 0), (0, 0), (0, diff)]  # Pad along the second dimension
+                                masked_ear_raster_data = np.pad(masked_ear_raster_data, padding, mode='constant', constant_values=0)
+
+                            else:
+                                # Pad masked_hazard_raster_data with zeros to match masked_ear_raster_data's shape
+                                diff = ear_data_shape[2] -  hazard_data_shape[2]
+                                padding = [(0, 0), (0, 0), (0, diff)]  # Pad along the second dimension
+                                masked_hazard_raster_data = np.pad(masked_hazard_raster_data, padding, mode='constant', constant_values=0)
                     
-                    for hazard_value in unique_hazard_pixel_values:
-                        for ear_value in unique_ear_pixel_values:
-                            total_pixel_exposed = np.sum((masked_hazard_raster_data == hazard_value) & (masked_ear_raster_data == ear_value))
-                            total_area_exposed=total_pixel_exposed*final_x_res*final_y_res
-                            relative_exposed=total_pixel_exposed*100/total_pixel_count
-                            ear_class_name=ear_value
-                            if ear_class_alias:
-                                try:
-                                    ear_class_name=ear_class_alias[ear_class_name]
-                                except Exception as e:
+                        if ear_interpolation=="Exact":
+                            print("exact interpolation*****************")
+                            for hazard_value in unique_hazard_pixel_values:
+                                for ear_value in unique_ear_pixel_values:
+                                    total_pixel_exposed = np.sum((masked_hazard_raster_data == hazard_value) & (masked_ear_raster_data == ear_value))
+                                    total_area_exposed=total_pixel_exposed*final_x_res*final_y_res
+                                    relative_exposed=total_pixel_exposed*100/total_pixel_count
                                     ear_class_name=ear_value
-                            df = df.append({
-                                    "hazard_name": hazard_value,
-                                    "ear_name": ear_class_name, 
-                                    "total_pixel_exposed": total_pixel_exposed,
-                                    "total_area_exposed":total_area_exposed,
-                                    "relative_exposed":round(relative_exposed,3),
-                                    "admin_id":admin[adminpk]
-                                    }, ignore_index=True)
-                elif ear_interpolation=="Discrete":
-                    #TODO: HANDLE HAZARD INTENSITY VALUE WITH MAX
-                   
-                    for hazard_class in hazard_intensity_classes:
-                        for ear_class in ear_classes:
-                            try:
-                                total_pixel_exposed = np.sum((clipped_hazard_raster_data >= float(hazard_class['val1'])) & (clipped_ear_raster_data >= float(ear_class['val1']))& (clipped_hazard_raster_data < float(hazard_class['val2'])) & (clipped_ear_raster_data < float(ear_class['val2'])))
-                                # total_pixel_exposed = np.sum((clipped_hazard_raster_data == hazard_value) & (clipped_ear_raster_data == ear_value))
-                                total_area_exposed=total_pixel_exposed*final_x_res*final_y_res
-                                relative_exposed=total_pixel_exposed*100/total_pixel_count
-                                df = df.append({
-                                        "hazard_name": hazard_class['class_name'],
-                                        "ear_name": ear_class['class_name'], 
-                                        "total_pixel_exposed": total_pixel_exposed,
-                                        "total_area_exposed":total_area_exposed,
-                                        "relative_exposed":round(relative_exposed,3),
-                                        "admin_id":admin[adminpk]
-                                        }, ignore_index=True)
-                            except Exception as e:
-                                continue
+                                    if ear_class_alias:
+                                        try:
+                                            ear_class_name=ear_class_alias[ear_class_name]
+                                        except Exception as e:
+                                            ear_class_name=ear_value
+                                    result.append({
+                                            "hazard_name": hazard_value,
+                                            "ear_name": ear_class_name, 
+                                            "total_pixel_exposed": total_pixel_exposed,
+                                            "total_area_exposed":total_area_exposed,
+                                            "relative_exposed":round(relative_exposed,3),
+                                            "admin_id":admin[adminpk]
+                                            })
+                        elif ear_interpolation=="Discrete":
+                            print("discrete interpolation*****************")
+                            #TODO: HANDLE HAZARD INTENSITY VALUE WITH MAX
+                            for hazard_class in hazard_intensity_classes:
+                                for ear_class in ear_classes:
+                                    try:
+                                        total_pixel_exposed = np.sum((clipped_hazard_raster_data >= float(hazard_class['val1'])) & (clipped_ear_raster_data >= float(ear_class['val1']))& (clipped_hazard_raster_data < float(hazard_class['val2'])) & (clipped_ear_raster_data < float(ear_class['val2'])))
+                                        # total_pixel_exposed = np.sum((clipped_hazard_raster_data == hazard_value) & (clipped_ear_raster_data == ear_value))
+                                        total_area_exposed=total_pixel_exposed*final_x_res*final_y_res
+                                        relative_exposed=total_pixel_exposed*100/total_pixel_count
+                                        result.append({
+                                                "hazard_name": hazard_class['class_name'],
+                                                "ear_name": ear_class['class_name'], 
+                                                "total_pixel_exposed": total_pixel_exposed,
+                                                "total_area_exposed":total_area_exposed,
+                                                "relative_exposed":round(relative_exposed,3),
+                                                "admin_id":admin[adminpk]
+                                                })
+                                    except Exception as e:
+                                        continue
+                        else:
+                            print("Interpolation is not handled")
+                        return result
+                    except Exception as e:
+                        print("error in admin process",str(e))
+                        return None
+                    
+                # df = pd.DataFrame(columns=["hazard_name", "ear_name", "total_pixel_exposed","total_area_exposed","relative_exposed","admin_id"])
+                
+                results=[]
+                #Start monitoring
+                pause_event = threading.Event()
+                
+                # Start memory monitor thread
+                monitor_thread = threading.Thread(target=monitor_memory, args=(pause_event,))
+                monitor_thread.start()
+                
+                print(datetime.datetime.now(),"parallel process start")
+                with ThreadPoolExecutor(max_workers=num_cores) as executor:
+                    futures = [
+                        executor.submit(
+                            process_admin_unit, admin)
+                        for _, admin in admin_df.iterrows()
+                    ]
+                    
+                    for future in futures:
+                        if future.result():
+                            results+=future.result()
+                print(datetime.datetime.now(),"parallel process end")
+                
+                df=pd.DataFrame(results)
+                
+                # Ensure the monitor thread stops
+                monitor_thread.join(timeout=1)
+            except Exception as e:
+                return False, f"exposure calculation error with admin: {str(e)}", None,None
         else:
             #todo: temporarily commented until the loss is not finalized
             # haz_layer_name = kwargs.get('haz_layer_name', None)
@@ -743,7 +859,8 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
                 'x_resolution':final_x_res,
                 'y_resolution':final_y_res,
                 'x_origin':haz_x_origin,
-                'y_origin':haz_y_origin
+                'y_origin':haz_y_origin,
+                'compress': 'lzw',
             }
             ear_metadata = {
                 'driver': 'GTiff',
@@ -756,7 +873,8 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
                 'x_resolution':final_x_res,
                 'y_resolution':final_y_res,
                 'x_origin':ear_x_origin,
-                'y_origin':ear_y_origin
+                'y_origin':ear_y_origin,
+                'compress': 'lzw',
             }
             
             exp_output_file_path = kwargs.get('exp_output_file_path', None)
@@ -766,44 +884,102 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
              
             #handeling nodata and nan value in hazard datasets
             has_nodata = np.isnan(clipped_hazard_raster_data).any()  
+            
             if has_nodata:
                 clipped_hazard_raster_data = np.nan_to_num(clipped_hazard_raster_data, nan=0.0)
-            nodata = resampled_hazard_raster.nodata
-            clipped_hazard_raster_data[clipped_hazard_raster_data == nodata]=0.0
-            clipped_hazard_raster_data = clipped_hazard_raster_data[clipped_hazard_raster_data != nodata] 
+                nodata = resampled_hazard_raster.nodata
+                if nodata is not None:
+                    clipped_hazard_raster_data[clipped_hazard_raster_data == nodata]=0.0
+                    clipped_hazard_raster_data = clipped_hazard_raster_data[clipped_hazard_raster_data != nodata] 
             
             #handeling nodata and nan value in ear datasets
             has_nodata = np.isnan(clipped_ear_raster_data).any()  
             if has_nodata:
                 clipped_ear_raster_data = np.nan_to_num(clipped_ear_raster_data, nan=0.0)
-            nodata = resampled_ear_raster.nodata
-            clipped_ear_raster_data[clipped_ear_raster_data == nodata]=0.0
-            clipped_ear_raster_data = clipped_ear_raster_data[clipped_ear_raster_data != nodata] 
-            
+                nodata = resampled_ear_raster.nodata
+                if nodata is not None:
+                    clipped_ear_raster_data[clipped_ear_raster_data == nodata]=0.0
+                    clipped_ear_raster_data = clipped_ear_raster_data[clipped_ear_raster_data != nodata] 
+                    
             if ear_interpolation=="Exact":
-                #Get unique pixel value in hazard and ear datasets
-                unique_ear_pixel_values=np.unique(clipped_ear_raster_data)
-                unique_hazard_pixel_values=np.unique(clipped_hazard_raster_data)
-                for hazard_value in unique_hazard_pixel_values:
-                    for ear_value in unique_ear_pixel_values:
+                print("Exact interpolation--------------------------------------")
+                def compute_parallel_exposure(hazard_value, ear_value,pause_event):
+                    try:
+                        while pause_event.is_set():
+                            time.sleep(1)
                         total_pixel_exposed = np.sum((clipped_hazard_raster_data == hazard_value) & (clipped_ear_raster_data == ear_value))
-                        total_area_exposed=total_pixel_exposed*final_x_res*final_y_res
-                        relative_exposed=total_pixel_exposed*100/total_pixel_count
-                        ear_class_name=ear_value
+                        total_pixel_exposed= total_pixel_exposed.item() if isinstance(total_pixel_exposed, np.generic) else total_pixel_exposed
+                        
+                        total_area_exposed = total_pixel_exposed * final_x_res * final_y_res
+                        relative_exposed = total_pixel_exposed * 100 / total_pixel_count
+                        ear_class_name = ear_value
                         if ear_class_alias:
+                            # ear_class_name = ear_class_alias.get(ear_value, ear_value)
                             try:
                                 ear_class_name=ear_class_alias[ear_class_name]
                             except Exception as e:
                                 ear_class_name=ear_value
-                        df = df.append({
-                                "hazard_name": hazard_value,
-                                "ear_name": ear_class_name, 
-                                "total_pixel_exposed": total_pixel_exposed,
-                                "total_area_exposed":total_area_exposed,
-                                "relative_exposed":round(relative_exposed,3),
-                                }, ignore_index=True)
+                        
+                        return {
+                            "hazard_name": hazard_value,
+                            "ear_name": ear_class_name,
+                            "total_pixel_exposed": total_pixel_exposed,
+                            "total_area_exposed": total_area_exposed,
+                            "relative_exposed": round(relative_exposed, 3)
+                        }
+                    except Exception as e:
+                        print("compute_parallel_exposure error", str(e))
+                        return False, f"compute_parallel_exposure error: {str(e)}", None,None
+                
+                #Get unique pixel value in hazard and ear datasets
+                # unique_ear_pixel_values=np.unique(clipped_ear_raster_data)
+                # unique_hazard_pixel_values=np.unique(clipped_hazard_raster_data)
+                dask_ear_array = da.from_array(clipped_ear_raster_data, chunks='auto')
+                unique_ear_pixel_values = da.unique(dask_ear_array).compute()
+                
+                dask_haz_array = da.from_array(clipped_hazard_raster_data, chunks='auto')
+                unique_hazard_pixel_values = da.unique(dask_haz_array).compute()
+                # for hazard_value in unique_hazard_pixel_values:
+                #     for ear_value in unique_ear_pixel_values:
+                #         total_pixel_exposed = np.sum((clipped_hazard_raster_data == hazard_value) & (clipped_ear_raster_data == ear_value))
+                #         total_area_exposed=total_pixel_exposed*final_x_res*final_y_res
+                #         relative_exposed=total_pixel_exposed*100/total_pixel_count
+                #         ear_class_name=ear_value
+                #         if ear_class_alias:
+                #             try:
+                #                 ear_class_name=ear_class_alias[ear_class_name]
+                #             except Exception as e:
+                #                 ear_class_name=ear_value
+                #         df = df.append({
+                #                 "hazard_name": hazard_value,
+                #                 "ear_name": ear_class_name, 
+                #                 "total_pixel_exposed": total_pixel_exposed,
+                #                 "total_area_exposed":total_area_exposed,
+                #                 "relative_exposed":round(relative_exposed,3),
+                #                 }, ignore_index=True)
+                
+                #Start monitoring
+                pause_event = threading.Event()
+                
+                # Start memory monitor thread
+                monitor_thread = threading.Thread(target=monitor_memory, args=(pause_event,))
+                monitor_thread.start()
+                
+                print(datetime.datetime.now(),"parallel process start")
+                with ThreadPoolExecutor(max_workers=num_cores) as executor:
+                    futures = []
+                    for hazard_value in unique_hazard_pixel_values:
+                        for ear_value in unique_ear_pixel_values:
+                            futures.append(executor.submit(compute_parallel_exposure, hazard_value, ear_value,pause_event))
+                    results = [future.result() for future in futures]
+                
+                # print(datetime.datetime.now(),"parallel process end")
+                df=pd.DataFrame(results)
+                # Ensure the monitor thread stops
+                monitor_thread.join(timeout=1)
                         
             elif ear_interpolation=="Discrete":
+                
                 hazard_intensity_classes_df=readmeta.getHazardIntensityClasses(con,hazid)
                 ear_classes_df=readmeta.getRasterEarDiscreteClass(con,earid)
                 hazard_intensity_classes=[]
@@ -841,14 +1017,20 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
                                     }, ignore_index=True)
                         except Exception as e:
                             continue
-                    
+            
+            else:
+                return False, f"ear_interpolation: {ear_interpolation} is not defined", None, None    
             df['admin_id'] = None 
         table_name="raster_exposure_result"
         df['exposure_id'] = expid
         if df.empty:
-            return False, "Empty datasets"
+            return False, "Empty datasets",None,None
+        df = df.applymap(lambda x: x.item() if isinstance(x, np.generic) else x)
+        # writeexposure(df, con, schema,table_name)
         writevector.writeexposure(df, con, schema,table_name)
         return True,"success",ear_metadata,hazard_metadata
     except Exception as e:
+        print("error occccccccccccccc",str(e))
         return False, str(e), None,None
     
+

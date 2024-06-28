@@ -390,7 +390,7 @@ def getGriddedExposureSummary(con, exposure_id, column='total_area_exposed', agg
         if aggregation=='ear_admin_wise':
             # if agg:
             summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
-                                    columns=["hazard_name"],  fill_value=0) #aggfunc=np.sum,
+                                    columns=["hazard_name"], fill_value=0) #aggfunc=np.sum,
             summary = summary.reset_index()
             summary = summary.rename(
                 columns={type_col: "Ear Class", "admin_id": "Admin Name"})
@@ -398,7 +398,7 @@ def getGriddedExposureSummary(con, exposure_id, column='total_area_exposed', agg
         elif aggregation=='admin_wise':
             # if agg:
             summary = pd.pivot_table(exposure, values=column, index=['admin_id'],
-                                    columns=["hazard_name"],  fill_value=0) #aggfunc=np.sum,
+                                    columns=["hazard_name"],aggfunc=np.sum,  fill_value=0) #aggfunc=np.sum,
             summary = summary.reset_index()
             summary = summary.rename(
                 columns={type_col: "Ear Class", "admin_id": "Admin Name"})

@@ -2,6 +2,7 @@ import geopandas as gpd
 from sqlalchemy.engine import create_engine
 from geoalchemy2 import Geometry, WKTElement
 from .utils import get_geom_type,is_utm_epsg,utm_finder
+from pyproj import CRS
 
 def load_db(query, source_connection, destination_connection, destination_table, destination_schema, index):
     #TODO if df.crs is not projected, convert it
@@ -58,3 +59,5 @@ def load_db(query, source_connection, destination_connection, destination_table,
         return True, "success",geometry_type
     except Exception as e:
         return False, str(e),None
+    
+    
