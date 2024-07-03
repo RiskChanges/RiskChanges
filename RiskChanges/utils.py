@@ -201,7 +201,7 @@ def raster_data_cleaning(out_path):
         return False, str(e)
 
 #Using rasterio
-def rasterio_based_custom_raster_projection(file_path, out_path):
+def rasterio_based_custom_raster_projection(file_path, out_path,resampling):
     print("rasterio based custom raster projection called")
     try:
         ds = rasterio.open(file_path)
@@ -229,6 +229,15 @@ def rasterio_based_custom_raster_projection(file_path, out_path):
                         'transform': dst_transform,
                         'width': width,
                         'height': height})
+            if resampling=="nearest":
+                resampling_method=Resampling.nearest
+            elif resampling=="bilinear":
+                resampling_method=Resampling.bilinear
+            elif resampling=="cubic":
+                resampling_method=Resampling.cubic
+            else:
+                return False, "Invalid resampling method for rasterio basedcustom raster projection"
+            print("applying resamplibg method-----------------------",resampling_method)
             with rasterio.open(out_path, 'w', **kwargs) as dst:
                 for i in range(1, ds.count + 1):
                     reproject(
@@ -238,7 +247,8 @@ def rasterio_based_custom_raster_projection(file_path, out_path):
                         src_crs=src_crs.to_string(),
                         dst_transform=dst_transform,
                         dst_crs=dst_crs.to_string(),
-                        resampling=Resampling.nearest
+                        # resampling=Resampling.nearest
+                        resampling=resampling_method
                         )
         ds.close()
         data_cleaning_success, data_cleaning_response =raster_data_cleaning(out_path)
@@ -248,7 +258,10 @@ def rasterio_based_custom_raster_projection(file_path, out_path):
     except Exception as e:
         return False, str(e)
     
-def custom_raster_projection(file_path, out_path):
+def custom_raster_projection(file_path, out_path, resampling="nearest"):
+    '''
+    resampling methods: nearest, bilinear, cubic
+    '''
     print("gdal based custom raster projection called")
     try:
         gdal.SetConfigOption('GTIFF_HONOUR_NEGATIVE_SCALEY', 'YES')
@@ -270,11 +283,8 @@ def custom_raster_projection(file_path, out_path):
         
         dst_crs=ds_crs_wkt
         dst_utm_epsg=ds_crs_epsg
-        
         ds = gdal.Open(file_path)
-        
         if not is_UTM_epsg:
-           
             bbox = (gt[0], gt[3] + gt[5] * ds.RasterYSize, gt[0] + gt[1] * ds.RasterXSize, gt[3])
             success, dst_utm_epsg = utm_finder(ds_crs_wkt, bbox)
             if not success:
@@ -282,11 +292,21 @@ def custom_raster_projection(file_path, out_path):
             dst_crs = osr.SpatialReference()
             dst_crs.ImportFromEPSG(int(dst_utm_epsg))
             dst_crs_wkt = dst_crs.ExportToWkt()
-            gdal.Warp(out_path, ds, dstSRS=dst_crs_wkt, xRes=gt[1], yRes=gt[5], resampleAlg=gdal.GRA_NearestNeighbour) #dstNodata=0,
+            
+            if resampling=="nearest":
+                resampling_method=gdal.GRA_NearestNeighbour
+            elif resampling=="bilinear":
+                resampling_method=gdal.GRA_Bilinear
+            elif resampling=="cubic":
+                resampling_method=gdal.GRA_Cubic
+            else:
+                return False, "Invalid resampling method for custom raster projection"
+            print("applying resamplibg method-----------------------",resampling_method)
+            gdal.Warp(out_path, ds, dstSRS=dst_crs_wkt, xRes=gt[1], yRes=gt[5], resampleAlg=resampling_method) #dstNodata=0,
             data_cleaning_success, data_cleaning_response =raster_data_cleaning(out_path)
             if data_cleaning_success==False:
                 return False, data_cleaning_response
         return True, {"dst_crs":dst_crs,"dst_utm_epsg":dst_utm_epsg}
     except Exception as e:
-        proj_success, proj_result=rasterio_based_custom_raster_projection(file_path,file_path)
+        proj_success, proj_result=rasterio_based_custom_raster_projection(file_path,file_path,resampling)
         return proj_success, proj_result

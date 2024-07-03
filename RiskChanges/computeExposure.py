@@ -495,10 +495,11 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
             ear_class_alias = kwargs.get('ear_class_alias', None)
             hazard_raster = readhaz(con, hazid, haz_file)
             ear_raster = rasterio.open(ear_file) #handle this
+            ear_resampling="nearest"
         elif ear_interpolation=="Discrete" or ear_interpolation=="Linear":
             ear_raster = rasterio.open(ear_file) #handle this
             hazard_raster = rasterio.open(haz_file) #handle this
-            
+            ear_resampling="bilinear"
             hazard_intensity_classes_df=readmeta.getHazardIntensityClasses(con,hazid)
             ear_classes_df=readmeta.getRasterEarDiscreteClass(con,earid)
 
@@ -526,16 +527,23 @@ def ComputeRasterExposure(con, earid, hazid, expid, **kwargs):
         resampled_ear_height=int((ear_raster.height * ear_raster.res[1]) / final_y_res)
         
         # Resample the source raster to match the target resolution
-        def resample_data(raster,height, width):
+        
+        # def resample_data(raster,height, width):
+        #     resampled_data = raster.read(
+        #         out_shape=(raster.count, height, width),
+        #         resampling=Resampling.nearest
+        #         )
+        #     return resampled_data
+        def resample_data(raster,height, width,resampling='nearest'):
             resampled_data = raster.read(
                 out_shape=(raster.count, height, width),
-                resampling=Resampling.nearest
+                resampling=resampling
                 )
             return resampled_data
         print("Compute raster exposure calculation called-------------------------2")
         with ThreadPoolExecutor() as executor:
             future_hazard = executor.submit(resample_data, hazard_raster, resampled_haz_height, resampled_haz_width)
-            future_ear = executor.submit(resample_data, ear_raster, resampled_ear_height, resampled_ear_width)            
+            future_ear = executor.submit(resample_data, ear_raster, resampled_ear_height, resampled_ear_width,resampling=ear_resampling)            
             resampled_haz_data = future_hazard.result()
             resampled_ear_data = future_ear.result()
         
