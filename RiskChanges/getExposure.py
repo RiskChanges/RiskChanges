@@ -355,6 +355,7 @@ def getShapefileRel(con, exposureid, column='areaOrLen', aggregation=None):
     except Exception as e:
         raise Exception(f"Error in getSummary {str(e)}")
 
+# Get Summary
 def getGriddedExposureSummary(con, exposure_id, column='total_area_exposed', aggregation=None):
     '''
     aggregation: individual_ear_class,admin_wise,ear_admin_wise
@@ -373,22 +374,14 @@ def getGriddedExposureSummary(con, exposure_id, column='total_area_exposed', agg
             exposure=get_exp_response
         else:
              raise Exception(f"Error in get exposure data: {get_exp_response}")
-        
         hazid = metadata['hazid']
         classificationScheme = readmeta.classificationscheme(con, hazid)
         thresholds=classificationScheme['val1'].unique()
         thresholds.sort()
-        min_thresholds=[float(val) for val in thresholds]
         type_col = "ear_name" #metadata["TypeColumn"]
         
-        # response,add_hazard_class_result,hazard_class_dict=add_hazard_class(exposure,min_thresholds,classificationScheme,"hazard_name")
-        
-        # if response:
-            # exposure=add_hazard_class_result
-        # else:
-            # raise Exception(f"Error in add_hazard_class_result: {add_hazard_class_result}")
         if aggregation=='ear_admin_wise':
-            # if agg:
+            # agg:
             summary = pd.pivot_table(exposure, values=column, index=[type_col, 'admin_id'],
                                     columns=["hazard_name"], fill_value=0) #aggfunc=np.sum,
             summary = summary.reset_index()
@@ -396,7 +389,7 @@ def getGriddedExposureSummary(con, exposure_id, column='total_area_exposed', agg
                 columns={type_col: "Ear Class", "admin_id": "Admin Name"})
         
         elif aggregation=='admin_wise':
-            # if agg:
+            # agg:
             summary = pd.pivot_table(exposure, values=column, index=['admin_id'],
                                     columns=["hazard_name"],aggfunc=np.sum,  fill_value=0) #aggfunc=np.sum,
             summary = summary.reset_index()
@@ -429,3 +422,5 @@ def getGriddedExposureSummary(con, exposure_id, column='total_area_exposed', agg
     except Exception as e:
         return False, str(e)
         # raise Exception(f"Error in getSummary {str(e)}")
+        
+        
