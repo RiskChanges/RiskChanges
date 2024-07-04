@@ -61,9 +61,9 @@ def ClassifyHazard(hazard_file, base, stepsize, threshold,is_reclassification_re
     file_name, file_extension = os.path.splitext(infile)
     outfile = hazard_file.replace(file_extension, f"_reclassified{file_extension}")
     if is_reclassification_required or not os.path.isfile(outfile):
-        print(base,"basee")
-        print(stepsize,"stepsizee")
-        print(threshold,"thresholde")
+        # print(base,"basee")
+        # print(stepsize,"stepsizee")
+        # print(threshold,"thresholde")
         reclassify(infile, outfile, base, stepsize, threshold)
     return outfile
 
